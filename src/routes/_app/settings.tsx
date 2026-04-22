@@ -1,13 +1,49 @@
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — HealthOS" }] }),
   component: Settings,
 });
+
+const HEALTH_GOALS = [
+  "Better sleep",
+  "Reduce stress",
+  "More energy",
+  "Build consistency",
+  "General wellness",
+  "Athletic performance",
+];
+
+type UnitSystem = "metric" | "imperial";
+
+type NotificationPrefs = {
+  daily_checkin: boolean;
+  weekly_report: boolean;
+  ai_recommendations: boolean;
+  milestones: boolean;
+};
+
+const DEFAULT_NOTIFS: NotificationPrefs = {
+  daily_checkin: true,
+  weekly_report: true,
+  ai_recommendations: true,
+  milestones: false,
+};
 
 function Section({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
   return (
@@ -20,25 +56,84 @@ function Section({ title, desc, children }: { title: string; desc: string; child
 }
 
 function Settings() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [healthGoal, setHealthGoal] = useState<string>("");
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>("metric");
+  const [notifs, setNotifs] = useState<NotificationPrefs>(DEFAULT_NOTIFS);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("user_preferences")
+        .select("health_goal, unit_system, notification_preferences")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!active) return;
+      if (error) {
+        toast.error(error.message);
+      } else if (data) {
+        setHealthGoal(data.health_goal ?? "");
+        setUnitSystem(data.unit_system);
+        setNotifs({ ...DEFAULT_NOTIFS, ...(data.notification_preferences as Partial<NotificationPrefs>) });
+      }
+      setLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  async function save() {
+    if (!user) return;
+    setSaving(true);
+    const { error } = await supabase.from("user_preferences").upsert(
+      {
+        user_id: user.id,
+        health_goal: healthGoal || null,
+        unit_system: unitSystem,
+        notification_preferences: notifs,
+      },
+      { onConflict: "user_id" },
+    );
+    setSaving(false);
+    if (error) toast.error(error.message);
+    else toast.success("Preferences saved.");
+  }
+
   return (
     <div className="max-w-3xl space-y-5">
-      <header>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-muted-foreground">Personalize HealthOS to fit your life.</p>
+      <header className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Settings</h1>
+          <p className="text-sm text-muted-foreground">Personalize HealthOS to fit your life.</p>
+        </div>
+        <Button onClick={save} disabled={loading || saving || !user} className="rounded-full">
+          {saving ? "Saving..." : "Save changes"}
+        </Button>
       </header>
 
       <Section title="Profile" desc="Your basic information.">
         <div className="grid sm:grid-cols-2 gap-4">
           <div><Label>Full name</Label><Input className="mt-1 rounded-xl" defaultValue="Alex Rivera" /></div>
-          <div><Label>Email</Label><Input className="mt-1 rounded-xl" defaultValue="alex@email.com" /></div>
+          <div><Label>Email</Label><Input className="mt-1 rounded-xl" defaultValue={user?.email ?? ""} readOnly /></div>
         </div>
       </Section>
 
-      <Section title="Health Goals" desc="What are you optimizing for?">
+      <Section title="Health Goal" desc="What are you optimizing for?">
         <div className="grid sm:grid-cols-2 gap-3">
-          {["Better sleep", "Reduce stress", "More energy", "Build consistency", "General wellness", "Athletic performance"].map((g) => (
+          {HEALTH_GOALS.map((g) => (
             <label key={g} className="flex items-center gap-2 rounded-xl border border-border p-3 cursor-pointer hover:bg-muted">
-              <input type="checkbox" defaultChecked={g === "Better sleep"} className="accent-primary" />
+              <input
+                type="radio"
+                name="health_goal"
+                checked={healthGoal === g}
+                onChange={() => setHealthGoal(g)}
+                className="accent-primary"
+              />
               <span className="text-sm">{g}</span>
             </label>
           ))}
@@ -47,21 +142,35 @@ function Settings() {
 
       <Section title="Units & Preferences" desc="Display preferences.">
         <div className="grid sm:grid-cols-2 gap-4">
-          <div><Label>Unit system</Label><Input className="mt-1 rounded-xl" defaultValue="Metric" /></div>
+          <div>
+            <Label>Unit system</Label>
+            <Select value={unitSystem} onValueChange={(v) => setUnitSystem(v as UnitSystem)}>
+              <SelectTrigger className="mt-1 rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="metric">Metric</SelectItem>
+                <SelectItem value="imperial">Imperial</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div><Label>Time zone</Label><Input className="mt-1 rounded-xl" defaultValue="Asia/Kolkata" /></div>
         </div>
       </Section>
 
       <Section title="Notifications" desc="Stay informed without the noise.">
-        {[
-          ["Daily check-in reminder", true],
-          ["Weekly report", true],
-          ["AI recommendations", true],
-          ["Milestones & streaks", false],
-        ].map(([label, def]) => (
-          <div key={label as string} className="flex items-center justify-between">
+        {([
+          ["Daily check-in reminder", "daily_checkin"],
+          ["Weekly report", "weekly_report"],
+          ["AI recommendations", "ai_recommendations"],
+          ["Milestones & streaks", "milestones"],
+        ] as const).map(([label, key]) => (
+          <div key={key} className="flex items-center justify-between">
             <span className="text-sm">{label}</span>
-            <Switch defaultChecked={def as boolean} />
+            <Switch
+              checked={notifs[key]}
+              onCheckedChange={(v) => setNotifs((n) => ({ ...n, [key]: v }))}
+            />
           </div>
         ))}
       </Section>
