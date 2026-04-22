@@ -40,6 +40,28 @@ function AppShell() {
     if (!loading && !user) navigate({ to: "/auth" });
   }, [user, loading, navigate]);
 
+  useEffect(() => {
+    if (loading || !user) return;
+    let active = true;
+    (async () => {
+      const [{ data: profile }, { data: prefs }] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+        supabase
+          .from("user_preferences")
+          .select("health_goal")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
+      if (!active) return;
+      const hasName = !!profile?.full_name?.trim();
+      const hasGoal = !!prefs?.health_goal?.trim();
+      if (!hasName || !hasGoal) navigate({ to: "/onboarding" });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user, loading, navigate]);
+
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
