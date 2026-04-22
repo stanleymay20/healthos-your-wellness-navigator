@@ -5,6 +5,7 @@ import { devices } from "@/lib/mock-data";
 import { Watch, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isIntegratedProvider } from "@/lib/providers";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/devices")({
@@ -129,6 +130,10 @@ function Devices() {
                   disabled={comingSoon || pending}
                   onClick={() => {
                     if (comingSoon) return;
+                    if (isIntegratedProvider(d.id) && !connected) {
+                      toast.info("Real OAuth connection is landing soon.");
+                      return;
+                    }
                     toggle(d.id, connected ? "disconnected" : "connected");
                   }}
                   className={`mt-5 w-full rounded-xl ${
