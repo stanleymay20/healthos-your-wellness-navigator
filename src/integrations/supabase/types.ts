@@ -14,7 +14,246 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      device_connections: {
+        Row: {
+          created_at: string
+          external_user_id: string | null
+          id: string
+          last_synced_at: string | null
+          provider: string
+          status: Database["public"]["Enums"]["device_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          external_user_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          provider: string
+          status?: Database["public"]["Enums"]["device_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          external_user_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          status?: Database["public"]["Enums"]["device_status"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      health_logs: {
+        Row: {
+          created_at: string
+          energy_level: number | null
+          exercise_minutes: number | null
+          id: string
+          log_date: string
+          meals_note: string | null
+          meditation_minutes: number | null
+          mood: string | null
+          sleep_hours: number | null
+          stress_level: number | null
+          symptoms_note: string | null
+          user_id: string
+          water_liters: number | null
+        }
+        Insert: {
+          created_at?: string
+          energy_level?: number | null
+          exercise_minutes?: number | null
+          id?: string
+          log_date?: string
+          meals_note?: string | null
+          meditation_minutes?: number | null
+          mood?: string | null
+          sleep_hours?: number | null
+          stress_level?: number | null
+          symptoms_note?: string | null
+          user_id: string
+          water_liters?: number | null
+        }
+        Update: {
+          created_at?: string
+          energy_level?: number | null
+          exercise_minutes?: number | null
+          id?: string
+          log_date?: string
+          meals_note?: string | null
+          meditation_minutes?: number | null
+          mood?: string | null
+          sleep_hours?: number | null
+          stress_level?: number | null
+          symptoms_note?: string | null
+          user_id?: string
+          water_liters?: number | null
+        }
+        Relationships: []
+      }
+      health_scores: {
+        Row: {
+          activity_score: number | null
+          created_at: string
+          id: string
+          nutrition_score: number | null
+          overall_score: number
+          recovery_score: number | null
+          score_date: string
+          sleep_score: number | null
+          stress_score: number | null
+          user_id: string
+        }
+        Insert: {
+          activity_score?: number | null
+          created_at?: string
+          id?: string
+          nutrition_score?: number | null
+          overall_score: number
+          recovery_score?: number | null
+          score_date?: string
+          sleep_score?: number | null
+          stress_score?: number | null
+          user_id: string
+        }
+        Update: {
+          activity_score?: number | null
+          created_at?: string
+          id?: string
+          nutrition_score?: number | null
+          overall_score?: number
+          recovery_score?: number | null
+          score_date?: string
+          sleep_score?: number | null
+          stress_score?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      insights: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          severity: Database["public"]["Enums"]["insight_severity"]
+          title: string
+          type: Database["public"]["Enums"]["insight_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          severity?: Database["public"]["Enums"]["insight_severity"]
+          title: string
+          type?: Database["public"]["Enums"]["insight_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          severity?: Database["public"]["Enums"]["insight_severity"]
+          title?: string
+          type?: Database["public"]["Enums"]["insight_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      recommendations: {
+        Row: {
+          category: Database["public"]["Enums"]["recommendation_category"]
+          completed_at: string | null
+          created_at: string
+          description: string
+          generated_for_date: string
+          id: string
+          priority: Database["public"]["Enums"]["recommendation_priority"]
+          status: Database["public"]["Enums"]["recommendation_status"]
+          title: string
+          user_id: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["recommendation_category"]
+          completed_at?: string | null
+          created_at?: string
+          description: string
+          generated_for_date?: string
+          id?: string
+          priority?: Database["public"]["Enums"]["recommendation_priority"]
+          status?: Database["public"]["Enums"]["recommendation_status"]
+          title: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["recommendation_category"]
+          completed_at?: string | null
+          created_at?: string
+          description?: string
+          generated_for_date?: string
+          id?: string
+          priority?: Database["public"]["Enums"]["recommendation_priority"]
+          status?: Database["public"]["Enums"]["recommendation_status"]
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          health_goal: string | null
+          id: string
+          notification_preferences: Json
+          unit_system: Database["public"]["Enums"]["unit_system"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          health_goal?: string | null
+          id?: string
+          notification_preferences?: Json
+          unit_system?: Database["public"]["Enums"]["unit_system"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          health_goal?: string | null
+          id?: string
+          notification_preferences?: Json
+          unit_system?: Database["public"]["Enums"]["unit_system"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +262,19 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      device_status: "connected" | "disconnected" | "pending"
+      insight_severity: "low" | "medium" | "high"
+      insight_type: "positive" | "warning" | "neutral"
+      recommendation_category:
+        | "sleep"
+        | "activity"
+        | "stress"
+        | "nutrition"
+        | "recovery"
+        | "mindfulness"
+      recommendation_priority: "low" | "medium" | "high"
+      recommendation_status: "pending" | "done" | "snoozed" | "dismissed"
+      unit_system: "metric" | "imperial"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +401,21 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      device_status: ["connected", "disconnected", "pending"],
+      insight_severity: ["low", "medium", "high"],
+      insight_type: ["positive", "warning", "neutral"],
+      recommendation_category: [
+        "sleep",
+        "activity",
+        "stress",
+        "nutrition",
+        "recovery",
+        "mindfulness",
+      ],
+      recommendation_priority: ["low", "medium", "high"],
+      recommendation_status: ["pending", "done", "snoozed", "dismissed"],
+      unit_system: ["metric", "imperial"],
+    },
   },
 } as const
