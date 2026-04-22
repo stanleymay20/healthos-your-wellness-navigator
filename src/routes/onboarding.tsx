@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { getOnboardingStatus } from "@/lib/onboarding";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({ meta: [{ title: "Welcome — HealthOS" }] }),
@@ -40,26 +41,24 @@ function Onboarding() {
     if (loading || !user) return;
     let active = true;
     (async () => {
-      const [{ data: profile }, { data: prefs }] = await Promise.all([
-        supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
-        supabase
-          .from("user_preferences")
-          .select("health_goal")
-          .eq("user_id", user.id)
-          .maybeSingle(),
-      ]);
-      if (!active) return;
-      const existingName =
-        profile?.full_name?.trim() ||
-        ((user.user_metadata?.full_name as string | undefined) ?? "").trim();
-      const existingGoal = prefs?.health_goal?.trim() ?? "";
-      if (existingName && existingGoal) {
-        navigate({ to: "/dashboard" });
-        return;
+      try {
+        const status = await getOnboardingStatus(user.id);
+        if (!active) return;
+        if (status.complete) {
+          navigate({ to: "/dashboard" });
+          return;
+        }
+        const seedName =
+          status.fullName ||
+          ((user.user_metadata?.full_name as string | undefined) ?? "").trim();
+        setFullName(seedName);
+        setGoal(status.healthGoal);
+        setHydrating(false);
+      } catch (e) {
+        if (!active) return;
+        toast.error((e as Error).message);
+        setHydrating(false);
       }
-      setFullName(existingName);
-      setGoal(existingGoal);
-      setHydrating(false);
     })();
     return () => {
       active = false;
