@@ -34,11 +34,15 @@ export const Route = createRootRoute({
       { title: "HealthOS — Understand. Predict. Act. Live Better." },
       { name: "description", content: "AI-powered preventive health intelligence." },
       { name: "author", content: "HealthOS" },
-      { property: "og:title", content: "HealthOS" },
+      { property: "og:title", content: "HealthOS — Understand. Predict. Act. Live Better." },
       { property: "og:description", content: "AI-powered preventive health intelligence." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@HealthOS" },
+      { name: "twitter:title", content: "HealthOS — Understand. Predict. Act. Live Better." },
+      { name: "twitter:description", content: "AI-powered preventive health intelligence." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9fa9ccbb-3862-40e9-b63f-5a3dea49c356/id-preview-83cc8f0f--386f5efa-1570-4f26-8093-3324fc8a5cba.lovable.app-1776868397243.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9fa9ccbb-3862-40e9-b63f-5a3dea49c356/id-preview-83cc8f0f--386f5efa-1570-4f26-8093-3324fc8a5cba.lovable.app-1776868397243.png" },
     ],
     links: [
       {
