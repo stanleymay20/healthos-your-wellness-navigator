@@ -25,6 +25,7 @@ import { Route as AppLogsRouteImport } from './routes/_app/logs'
 import { Route as AppInsightsRouteImport } from './routes/_app/insights'
 import { Route as AppDevicesRouteImport } from './routes/_app/devices'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as ApiIntegrationsOuraSyncRouteImport } from './routes/api/integrations/oura/sync'
 import { Route as ApiIntegrationsOuraCallbackRouteImport } from './routes/api/integrations/oura/callback'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -106,6 +107,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiIntegrationsOuraSyncRoute = ApiIntegrationsOuraSyncRouteImport.update({
+  id: '/api/integrations/oura/sync',
+  path: '/api/integrations/oura/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIntegrationsOuraCallbackRoute =
   ApiIntegrationsOuraCallbackRouteImport.update({
     id: '/api/integrations/oura/callback',
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
+  '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
+  '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
+  '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/api/integrations/oura/callback'
+    | '/api/integrations/oura/sync'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/api/integrations/oura/callback'
+    | '/api/integrations/oura/sync'
   id:
     | '__root__'
     | '/'
@@ -225,6 +236,7 @@ export interface FileRouteTypes {
     | '/_app/reports'
     | '/_app/settings'
     | '/api/integrations/oura/callback'
+    | '/api/integrations/oura/sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -237,6 +249,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiIntegrationsOuraCallbackRoute: typeof ApiIntegrationsOuraCallbackRoute
+  ApiIntegrationsOuraSyncRoute: typeof ApiIntegrationsOuraSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -353,6 +366,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/integrations/oura/sync': {
+      id: '/api/integrations/oura/sync'
+      path: '/api/integrations/oura/sync'
+      fullPath: '/api/integrations/oura/sync'
+      preLoaderRoute: typeof ApiIntegrationsOuraSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/integrations/oura/callback': {
       id: '/api/integrations/oura/callback'
       path: '/api/integrations/oura/callback'
@@ -397,6 +417,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiIntegrationsOuraCallbackRoute: ApiIntegrationsOuraCallbackRoute,
+  ApiIntegrationsOuraSyncRoute: ApiIntegrationsOuraSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
