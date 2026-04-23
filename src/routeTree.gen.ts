@@ -25,6 +25,7 @@ import { Route as AppLogsRouteImport } from './routes/_app/logs'
 import { Route as AppInsightsRouteImport } from './routes/_app/insights'
 import { Route as AppDevicesRouteImport } from './routes/_app/devices'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as ApiIntegrationsOuraCallbackRouteImport } from './routes/api/integrations/oura/callback'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -105,6 +106,12 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiIntegrationsOuraCallbackRoute =
+  ApiIntegrationsOuraCallbackRouteImport.update({
+    id: '/api/integrations/oura/callback',
+    path: '/api/integrations/oura/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/plan': typeof AppPlanRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -139,6 +147,7 @@ export interface FileRoutesByTo {
   '/plan': typeof AppPlanRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -158,6 +167,7 @@ export interface FileRoutesById {
   '/_app/plan': typeof AppPlanRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/reports'
     | '/settings'
+    | '/api/integrations/oura/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -194,6 +205,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/reports'
     | '/settings'
+    | '/api/integrations/oura/callback'
   id:
     | '__root__'
     | '/'
@@ -212,6 +224,7 @@ export interface FileRouteTypes {
     | '/_app/plan'
     | '/_app/reports'
     | '/_app/settings'
+    | '/api/integrations/oura/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -223,6 +236,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiIntegrationsOuraCallbackRoute: typeof ApiIntegrationsOuraCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -339,6 +353,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/integrations/oura/callback': {
+      id: '/api/integrations/oura/callback'
+      path: '/api/integrations/oura/callback'
+      fullPath: '/api/integrations/oura/callback'
+      preLoaderRoute: typeof ApiIntegrationsOuraCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -375,6 +396,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiIntegrationsOuraCallbackRoute: ApiIntegrationsOuraCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

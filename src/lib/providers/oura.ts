@@ -1,5 +1,12 @@
 import type { OAuthTokenRecord, ProviderDefinition, SyncResult } from "./types";
 
+export type OuraTokenResponse = {
+  access_token: string;
+  refresh_token: string | null;
+  expires_at: string | null;
+  scope: string | null;
+};
+
 export const OURA: ProviderDefinition = {
   id: "oura",
   name: "Oura Ring",
@@ -38,11 +45,48 @@ export function buildAuthUrl(_args: { state: string; codeChallenge: string }): s
   throw new Error("Oura OAuth redirect not implemented yet.");
 }
 
-export async function exchangeCodeForTokens(_args: {
+// Server-only. Exchanges an authorization code for an access/refresh token
+// pair using basic-auth with the Oura client secret. Returns just the token
+// fields; persistence / user association happens in the callback handler.
+export async function exchangeCodeForTokens(args: {
   code: string;
-  codeVerifier: string;
-}): Promise<OAuthTokenRecord> {
-  throw new Error("Oura token exchange not implemented yet.");
+  codeVerifier?: string;
+}): Promise<OuraTokenResponse> {
+  const env = getOuraEnv();
+  const params = new URLSearchParams({
+    grant_type: "authorization_code",
+    code: args.code,
+    redirect_uri: env.redirectUri,
+  });
+  if (args.codeVerifier) params.set("code_verifier", args.codeVerifier);
+
+  const basic = Buffer.from(`${env.clientId}:${env.clientSecret}`).toString("base64");
+  const res = await fetch(OURA_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+    },
+    body: params.toString(),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Oura token exchange failed (${res.status}): ${text || res.statusText}`);
+  }
+  const json = (await res.json()) as {
+    access_token: string;
+    refresh_token?: string;
+    expires_in?: number;
+    scope?: string;
+  };
+  return {
+    access_token: json.access_token,
+    refresh_token: json.refresh_token ?? null,
+    expires_at: json.expires_in
+      ? new Date(Date.now() + json.expires_in * 1000).toISOString()
+      : null,
+    scope: json.scope ?? null,
+  };
 }
 
 export async function refreshAccessToken(
