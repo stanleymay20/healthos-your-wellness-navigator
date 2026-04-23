@@ -29,6 +29,7 @@ import { Route as ApiAdminScoreParityRouteImport } from './routes/api/admin/scor
 import { Route as ApiAdminBackfillScoresRouteImport } from './routes/api/admin/backfill-scores'
 import { Route as ApiIntegrationsOuraSyncRouteImport } from './routes/api/integrations/oura/sync'
 import { Route as ApiIntegrationsOuraCallbackRouteImport } from './routes/api/integrations/oura/callback'
+import { Route as ApiIntegrationsOuraAuthorizeRouteImport } from './routes/api/integrations/oura/authorize'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -130,6 +131,12 @@ const ApiIntegrationsOuraCallbackRoute =
     path: '/api/integrations/oura/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiIntegrationsOuraAuthorizeRoute =
+  ApiIntegrationsOuraAuthorizeRouteImport.update({
+    id: '/api/integrations/oura/authorize',
+    path: '/api/integrations/oura/authorize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
@@ -170,6 +178,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
@@ -193,6 +202,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
@@ -216,6 +226,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/admin/backfill-scores'
     | '/api/admin/score-parity'
+    | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
   fileRoutesByTo: FileRoutesByTo
@@ -237,6 +248,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/admin/backfill-scores'
     | '/api/admin/score-parity'
+    | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
   id:
@@ -259,6 +271,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/api/admin/backfill-scores'
     | '/api/admin/score-parity'
+    | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
   fileRoutesById: FileRoutesById
@@ -274,6 +287,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiAdminBackfillScoresRoute: typeof ApiAdminBackfillScoresRoute
   ApiAdminScoreParityRoute: typeof ApiAdminScoreParityRoute
+  ApiIntegrationsOuraAuthorizeRoute: typeof ApiIntegrationsOuraAuthorizeRoute
   ApiIntegrationsOuraCallbackRoute: typeof ApiIntegrationsOuraCallbackRoute
   ApiIntegrationsOuraSyncRoute: typeof ApiIntegrationsOuraSyncRoute
 }
@@ -420,6 +434,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsOuraCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations/oura/authorize': {
+      id: '/api/integrations/oura/authorize'
+      path: '/api/integrations/oura/authorize'
+      fullPath: '/api/integrations/oura/authorize'
+      preLoaderRoute: typeof ApiIntegrationsOuraAuthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -458,6 +479,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ApiAdminBackfillScoresRoute: ApiAdminBackfillScoresRoute,
   ApiAdminScoreParityRoute: ApiAdminScoreParityRoute,
+  ApiIntegrationsOuraAuthorizeRoute: ApiIntegrationsOuraAuthorizeRoute,
   ApiIntegrationsOuraCallbackRoute: ApiIntegrationsOuraCallbackRoute,
   ApiIntegrationsOuraSyncRoute: ApiIntegrationsOuraSyncRoute,
 }

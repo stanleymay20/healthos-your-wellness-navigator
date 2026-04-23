@@ -136,6 +136,37 @@ function Devices() {
     toast.success(next === "connected" ? "Device connected" : "Device disconnected");
   }
 
+  async function connectIntegrated(provider: string) {
+    if (!user || busy.has(provider)) return;
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      toast.error("Not signed in.");
+      return;
+    }
+    setBusy((b) => new Set(b).add(provider));
+    try {
+      const res = await fetch(`/api/integrations/${provider}/authorize`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.ok === false || typeof body?.authorizeUrl !== "string") {
+        const msg = (body?.error as string) || `Could not start connection (${res.status})`;
+        toast.error(msg);
+        return;
+      }
+      window.location.assign(body.authorizeUrl);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy((b) => {
+        const n = new Set(b);
+        n.delete(provider);
+        return n;
+      });
+    }
+  }
+
   async function syncNow(provider: string) {
     if (!user || syncing.has(provider)) return;
     const accessToken = session?.access_token;
@@ -298,7 +329,7 @@ function Devices() {
                     onClick={() => {
                       if (comingSoon) return;
                       if (integrated && !connected) {
-                        toast.info("Real OAuth connection is landing soon.");
+                        connectIntegrated(d.id);
                         return;
                       }
                       toggle(d.id, connected ? "disconnected" : "connected");

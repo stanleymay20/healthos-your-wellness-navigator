@@ -40,9 +40,21 @@ export function getOuraEnv(): OuraEnv {
   return { clientId, clientSecret, redirectUri };
 }
 
-// Phase 8: placeholders only. Implementations land in a later phase.
-export function buildAuthUrl(_args: { state: string; codeChallenge: string }): string {
-  throw new Error("Oura OAuth redirect not implemented yet.");
+// Build the Oura OAuth2 authorize URL. Called server-side from the
+// initiation route; the caller is responsible for generating `state`
+// and `codeChallenge` and for persisting the matching verifier.
+export function buildAuthUrl(args: { state: string; codeChallenge: string }): string {
+  const env = getOuraEnv();
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: env.clientId,
+    redirect_uri: env.redirectUri,
+    scope: OURA.scopes.join(" "),
+    state: args.state,
+    code_challenge: args.codeChallenge,
+    code_challenge_method: "S256",
+  });
+  return `${OURA_AUTHORIZE_URL}?${params.toString()}`;
 }
 
 // Server-only. Exchanges an authorization code for an access/refresh token
