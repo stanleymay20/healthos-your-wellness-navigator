@@ -298,7 +298,7 @@ function Devices() {
                     onClick={() => {
                       if (comingSoon) return;
                       if (integrated && !connected) {
-                        toast.info("Real OAuth connection is landing soon.");
+                        startOAuth(d.id);
                         return;
                       }
                       toggle(d.id, connected ? "disconnected" : "connected");
