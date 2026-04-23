@@ -186,6 +186,36 @@ function Devices() {
     }
   }
 
+  async function startOAuth(provider: string) {
+    if (!user) return;
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      toast.error("Not signed in.");
+      return;
+    }
+    setBusy((b) => new Set(b).add(provider));
+    try {
+      const res = await fetch(`/api/integrations/${provider}/authorize`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body?.url) {
+        toast.error((body?.error as string) || `Could not start ${provider} connection.`);
+        return;
+      }
+      window.location.href = body.url as string;
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy((b) => {
+        const n = new Set(b);
+        n.delete(provider);
+        return n;
+      });
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header>
