@@ -26,8 +26,13 @@ class TokenRevokedError extends Error {
   }
 }
 
-type DailyPoint = { day: string; score: number | null };
-type DailyResponse = { data?: Array<{ day: string; score?: number | null }> };
+type OuraDailyRecord = Record<string, unknown> & {
+  day?: unknown;
+  score?: unknown;
+};
+type DailyPoint = { day: string; score: number | null; raw: OuraDailyRecord };
+type DailyResponse = { data?: OuraDailyRecord[] };
+type RecordType = "sleep" | "readiness" | "activity";
 
 export type SyncOutcome = {
   daysWritten: number;
@@ -61,7 +66,13 @@ async function fetchDaily(
     throw new Error(`Oura ${endpoint} failed (${res.status}): ${text || res.statusText}`);
   }
   const json = (await res.json()) as DailyResponse;
-  return (json.data ?? []).map((d) => ({ day: d.day, score: d.score ?? null }));
+  return (json.data ?? [])
+    .filter((d) => typeof d.day === "string")
+    .map((d) => ({
+      day: d.day as string,
+      score: typeof d.score === "number" ? d.score : null,
+      raw: d,
+    }));
 }
 
 function indexByDay(points: DailyPoint[]): Map<string, number | null> {
@@ -74,6 +85,23 @@ function avgPresent(values: Array<number | null | undefined>): number | null {
   const present = values.filter((v): v is number => typeof v === "number");
   if (present.length === 0) return null;
   return Math.round(present.reduce((a, b) => a + b, 0) / present.length);
+}
+
+function buildSnapshotRows(
+  userId: string,
+  recordType: RecordType,
+  points: DailyPoint[],
+): Array<Record<string, unknown>> {
+  const fetchedAt = new Date().toISOString();
+  return points.map((p) => ({
+    user_id: userId,
+    provider: PROVIDER,
+    record_date: p.day,
+    record_type: recordType,
+    score: p.score,
+    payload: p.raw,
+    fetched_at: fetchedAt,
+  }));
 }
 
 // Refreshes Oura tokens and persists the rotated pair. If the refresh token
@@ -208,6 +236,24 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       ...readyByDay.keys(),
       ...actByDay.keys(),
     ]);
+
+    // 5a. Persist raw snapshots for every fetched day, regardless of whether
+    //     we can compute a health_scores row from them. This is a dual-write
+    //     alongside the existing health_scores upsert — later phases can
+    //     derive scores from these snapshots rather than the live API.
+    const snapshotRows = [
+      ...buildSnapshotRows(userId, "sleep", sleep),
+      ...buildSnapshotRows(userId, "readiness", readiness),
+      ...buildSnapshotRows(userId, "activity", activity),
+    ];
+    if (snapshotRows.length > 0) {
+      const { error: snapErr } = await admin
+        .from("wearable_daily_snapshots")
+        .upsert(snapshotRows, {
+          onConflict: "user_id,provider,record_date,record_type",
+        });
+      if (snapErr) throw new Error(`snapshot upsert failed: ${snapErr.message}`);
+    }
 
     // 5. Upsert one health_scores row per day with at least one signal.
     //    UNIQUE (user_id, score_date) makes upsert idempotent.
