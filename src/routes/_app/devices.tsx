@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { devices } from "@/lib/mock-data";
@@ -22,8 +22,20 @@ type ConnectionRow = {
   sync_error: string | null;
 };
 
+async function fetchLatestInsightTitle(userId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("insights")
+    .select("title")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.title ?? null;
+}
+
 function Devices() {
   const { user, session } = useAuth();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Record<string, ConnectionRow>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<Set<string>>(new Set());
@@ -135,7 +147,20 @@ function Devices() {
         toast.error(msg);
       } else {
         const days = Number(body?.daysWritten ?? 0);
-        toast.success(days > 0 ? `Synced ${days} day${days === 1 ? "" : "s"}.` : "Sync complete — no new data.");
+        const headline = days > 0
+          ? `Synced ${days} day${days === 1 ? "" : "s"}.`
+          : "Sync complete — no new data.";
+        // Surface a preview of the freshest insight if one exists, and
+        // give the user a one-tap path to the full list.
+        const latestInsight = await fetchLatestInsightTitle(user.id);
+        toast.success(headline, {
+          description: latestInsight ?? undefined,
+          action: {
+            label: "View insights",
+            onClick: () =>
+              navigate({ to: "/insights", search: { synced: 1 } as never }),
+          },
+        });
       }
     } catch (e) {
       toast.error((e as Error).message);

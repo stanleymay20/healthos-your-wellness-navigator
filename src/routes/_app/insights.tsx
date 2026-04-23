@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { listInsights, type Insight } from "@/services/health";
-import { Lightbulb, TrendingUp, AlertTriangle, Loader2 } from "lucide-react";
+import { Lightbulb, TrendingUp, AlertTriangle, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/insights")({
@@ -12,16 +12,47 @@ export const Route = createFileRoute("/_app/insights")({
 function InsightsPage() {
   const [items, setItems] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
+  const [justSynced, setJustSynced] = useState(false);
+
+  function refresh() {
+    return listInsights(20)
+      .then(setItems)
+      .catch((e) => toast.error(e.message))
+      .finally(() => setLoading(false));
+  }
 
   useEffect(() => {
-    listInsights(20).then(setItems).catch((e) => toast.error(e.message)).finally(() => setLoading(false));
+    refresh();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("synced") === "1") {
+        setJustSynced(true);
+        params.delete("synced");
+        const qs = params.toString();
+        window.history.replaceState(
+          {},
+          "",
+          window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash,
+        );
+      }
+      const onFocus = () => refresh();
+      window.addEventListener("focus", onFocus);
+      return () => window.removeEventListener("focus", onFocus);
+    }
   }, []);
 
   return (
     <div className="max-w-5xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Your Insights</h1>
-        <p className="text-muted-foreground text-sm mt-1">Patterns we found in your recent logs.</p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Your Insights</h1>
+          <p className="text-muted-foreground text-sm mt-1">Patterns we found in your recent logs.</p>
+        </div>
+        {justSynced && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 text-success px-3 py-1 text-xs font-semibold">
+            <Sparkles className="h-3.5 w-3.5" /> Just synced
+          </span>
+        )}
       </header>
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
