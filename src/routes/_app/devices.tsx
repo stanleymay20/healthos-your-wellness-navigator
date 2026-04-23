@@ -167,6 +167,8 @@ function Devices() {
             const comingSoon = d.status === "coming-soon";
             const pending = busy.has(d.id);
             const integrated = isIntegratedProvider(d.id);
+            const needsReconnect =
+              integrated && !connected && status === "disconnected" && !!row?.sync_error;
             return (
               <div key={d.id} className="rounded-2xl bg-card border border-border shadow-card p-6">
                 <div className="flex items-start justify-between">
@@ -225,6 +227,8 @@ function Devices() {
                       "Notify me"
                     ) : connected ? (
                       <><RefreshCw className="h-4 w-4 mr-1" /> Disconnect</>
+                    ) : needsReconnect ? (
+                      <><RefreshCw className="h-4 w-4 mr-1" /> Reconnect</>
                     ) : (
                       <><CheckCircle2 className="h-4 w-4 mr-1" /> Connect</>
                     )}

@@ -3,10 +3,17 @@
 // are intentional follow-ups.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { OURA_API_BASE } from "./oura";
+import {
+  OURA_API_BASE,
+  refreshAccessToken,
+  RefreshTokenInvalidError,
+} from "./oura";
 
 const PROVIDER = "oura" as const;
 const DEFAULT_LOOKBACK_DAYS = 14;
+// Refresh tokens whose access_token expires within this window, so we avoid
+// burning a request on a near-dead token.
+const EXPIRY_SKEW_MS = 60_000;
 
 // Thrown only when the upstream signal clearly indicates the stored token
 // is no longer usable (revoked, expired beyond refresh, scope stripped,
@@ -69,6 +76,48 @@ function avgPresent(values: Array<number | null | undefined>): number | null {
   return Math.round(present.reduce((a, b) => a + b, 0) / present.length);
 }
 
+// Refreshes Oura tokens and persists the rotated pair. If the refresh token
+// itself is dead, drops the stored token row and throws TokenRevokedError so
+// the outer catch marks the connection disconnected — forcing a clean
+// reconnect flow rather than looping on a bad refresh token.
+async function refreshAndPersist(
+  userId: string,
+  refreshToken: string,
+): Promise<{ access_token: string; refresh_token: string | null }> {
+  const admin = supabaseAdmin as unknown as { from: (t: string) => any };
+  let fresh;
+  try {
+    fresh = await refreshAccessToken({ refreshToken });
+  } catch (err) {
+    if (err instanceof RefreshTokenInvalidError) {
+      await admin
+        .from("device_oauth_tokens")
+        .delete()
+        .eq("user_id", userId)
+        .eq("provider", PROVIDER);
+      throw new TokenRevokedError(
+        "Oura refresh token is no longer valid. Please reconnect.",
+      );
+    }
+    throw err;
+  }
+  const { error: updErr } = await admin
+    .from("device_oauth_tokens")
+    .update({
+      access_token: fresh.access_token,
+      refresh_token: fresh.refresh_token ?? refreshToken,
+      expires_at: fresh.expires_at,
+      scope: fresh.scope,
+    })
+    .eq("user_id", userId)
+    .eq("provider", PROVIDER);
+  if (updErr) throw new Error(`token refresh persist failed: ${updErr.message}`);
+  return {
+    access_token: fresh.access_token,
+    refresh_token: fresh.refresh_token ?? refreshToken,
+  };
+}
+
 export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
   const admin = supabaseAdmin as unknown as { from: (t: string) => any };
 
@@ -81,12 +130,12 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     .eq("provider", PROVIDER);
 
   try {
-    // 2. Load the stored access token. Refresh flow is intentionally out of
-    //    scope for this phase — if the token is bad, we surface that and
-    //    leave it to the user to reconnect.
+    // 2. Load the stored token row. Pre-flight refresh if the access token
+    //    is about to expire; surface reconnect when the refresh token itself
+    //    is invalid.
     const { data: tokenRow, error: tokenErr } = await admin
       .from("device_oauth_tokens")
-      .select("access_token")
+      .select("access_token, refresh_token, expires_at")
       .eq("user_id", userId)
       .eq("provider", PROVIDER)
       .maybeSingle();
@@ -95,7 +144,17 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     if (!tokenRow?.access_token) {
       throw new TokenRevokedError("No Oura connection found for this user.");
     }
-    const accessToken = tokenRow.access_token as string;
+    let accessToken = tokenRow.access_token as string;
+    let refreshToken = (tokenRow.refresh_token as string | null) ?? null;
+    const expiresAt = (tokenRow.expires_at as string | null) ?? null;
+
+    const expiresSoon =
+      !!expiresAt && new Date(expiresAt).getTime() - Date.now() <= EXPIRY_SKEW_MS;
+    if (expiresSoon && refreshToken) {
+      const fresh = await refreshAndPersist(userId, refreshToken);
+      accessToken = fresh.access_token;
+      refreshToken = fresh.refresh_token;
+    }
 
     // 3. Determine the date window. Use synced_through as the start cursor;
     //    fall back to a short lookback for the first sync.
@@ -117,12 +176,28 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       startDate = isoDate(back);
     }
 
-    // 4. Pull the three daily collections in parallel.
-    const [sleep, readiness, activity] = await Promise.all([
-      fetchDaily(accessToken, "daily_sleep", startDate, endDate),
-      fetchDaily(accessToken, "daily_readiness", startDate, endDate),
-      fetchDaily(accessToken, "daily_activity", startDate, endDate),
+    // 4. Pull the three daily collections in parallel. If the token has
+     //   been revoked provider-side we may hit 401 mid-flight — refresh
+     //   once and retry the whole batch.
+    const pullAll = (tok: string) => Promise.all([
+      fetchDaily(tok, "daily_sleep", startDate, endDate),
+      fetchDaily(tok, "daily_readiness", startDate, endDate),
+      fetchDaily(tok, "daily_activity", startDate, endDate),
     ]);
+
+    let sleep, readiness, activity;
+    try {
+      [sleep, readiness, activity] = await pullAll(accessToken);
+    } catch (err) {
+      if (err instanceof TokenRevokedError && refreshToken) {
+        const fresh = await refreshAndPersist(userId, refreshToken);
+        accessToken = fresh.access_token;
+        refreshToken = fresh.refresh_token;
+        [sleep, readiness, activity] = await pullAll(accessToken);
+      } else {
+        throw err;
+      }
+    }
 
     const sleepByDay = indexByDay(sleep);
     const readyByDay = indexByDay(readiness);

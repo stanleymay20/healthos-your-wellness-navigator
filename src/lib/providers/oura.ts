@@ -89,10 +89,58 @@ export async function exchangeCodeForTokens(args: {
   };
 }
 
-export async function refreshAccessToken(
-  _token: OAuthTokenRecord,
-): Promise<OAuthTokenRecord> {
-  throw new Error("Oura token refresh not implemented yet.");
+// Server-only. Exchanges a refresh token for a fresh access/refresh pair.
+// Oura rotates refresh tokens, so the returned refresh_token (when present)
+// must be persisted in place of the old one. Distinguishes a dead refresh
+// token (401/400 from Oura) from transient failures via RefreshTokenInvalidError.
+export class RefreshTokenInvalidError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RefreshTokenInvalidError";
+  }
+}
+
+export async function refreshAccessToken(args: {
+  refreshToken: string;
+}): Promise<OuraTokenResponse> {
+  const env = getOuraEnv();
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: args.refreshToken,
+  });
+  const basic = Buffer.from(`${env.clientId}:${env.clientSecret}`).toString("base64");
+  const res = await fetch(OURA_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+    },
+    body: params.toString(),
+  });
+  if (res.status === 400 || res.status === 401) {
+    const text = await res.text().catch(() => "");
+    throw new RefreshTokenInvalidError(
+      `Oura refresh token rejected (${res.status}): ${text || res.statusText}`,
+    );
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Oura refresh failed (${res.status}): ${text || res.statusText}`);
+  }
+  const json = (await res.json()) as {
+    access_token: string;
+    refresh_token?: string;
+    expires_in?: number;
+    scope?: string;
+  };
+  return {
+    access_token: json.access_token,
+    refresh_token: json.refresh_token ?? null,
+    expires_at: json.expires_in
+      ? new Date(Date.now() + json.expires_in * 1000).toISOString()
+      : null,
+    scope: json.scope ?? null,
+  };
 }
 
 export async function syncRecent(_token: OAuthTokenRecord): Promise<SyncResult> {
