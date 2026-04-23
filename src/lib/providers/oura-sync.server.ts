@@ -18,6 +18,37 @@ const DEFAULT_LOOKBACK_DAYS = 14;
 // burning a request on a near-dead token.
 const EXPIRY_SKEW_MS = 60_000;
 
+// Canonical sync-generated insights. Keyed by the exact title string the
+// pure generator emits; lets us (a) enrich with description/type/severity
+// and (b) scope the idempotent delete to this set of titles only.
+type InsightTone = "positive" | "warning" | "neutral";
+type InsightLevel = "low" | "medium" | "high";
+const SYNC_INSIGHT_CATALOG: Record<
+  string,
+  { description: string; type: InsightTone; severity: InsightLevel }
+> = {
+  "Your recovery is low. Prioritize rest today.": {
+    description: "Latest overall score is below 50. Consider a lighter day and earlier wind-down.",
+    type: "warning",
+    severity: "high",
+  },
+  "Your sleep quality dropped. Consider earlier sleep.": {
+    description: "Sleep score fell below 60. Protecting an earlier wind-down tonight can rebuild the baseline.",
+    type: "warning",
+    severity: "medium",
+  },
+  "Low activity detected. Try light movement today.": {
+    description: "Activity score is below 50. A short walk or mobility session can lift today's signal.",
+    type: "warning",
+    severity: "medium",
+  },
+  "You're improving. Keep your routine consistent.": {
+    description: "Overall score improved versus the previous day. Consistency is compounding.",
+    type: "positive",
+    severity: "low",
+  },
+};
+
 // Thrown only when the upstream signal clearly indicates the stored token
 // is no longer usable (revoked, expired beyond refresh, scope stripped,
 // user deleted on the provider side). Any other failure is considered
@@ -249,9 +280,11 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     const derived = deriveDailyScores(derivationInputs);
     const { daysWritten } = await persistDerivedScores(userId, derived);
 
-    // 5b. Generate quick post-sync insights from the two most recent score
-    //     rows. Temporary surface: console-only; no DB write, no return
-    //     shape change.
+    // 5b. Generate post-sync insights from the two most recent score rows
+    //     and persist them under the existing insights table. Idempotent
+    //     across repeated syncs on the same day: delete today's rows with
+    //     known sync-generated titles, then insert the fresh batch.
+    //     Failures are non-fatal — insights are advisory.
     try {
       const { data: recent } = await admin
         .from("health_scores")
@@ -261,11 +294,37 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
         .limit(2);
       const insights = generateInsights((recent ?? []) as Parameters<typeof generateInsights>[0]);
       if (insights.length > 0) {
-        console.log(`[oura-sync] insights for ${userId}:`, insights);
+        const rows = insights
+          .map((title) => {
+            const meta = SYNC_INSIGHT_CATALOG[title];
+            if (!meta) return null;
+            return {
+              user_id: userId,
+              title,
+              description: meta.description,
+              type: meta.type,
+              severity: meta.severity,
+            };
+          })
+          .filter((r): r is NonNullable<typeof r> => r !== null);
+
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        await admin
+          .from("insights")
+          .delete()
+          .eq("user_id", userId)
+          .gte("created_at", startOfToday.toISOString())
+          .in("title", Object.keys(SYNC_INSIGHT_CATALOG));
+
+        if (rows.length > 0) {
+          const { error: insErr } = await admin.from("insights").insert(rows);
+          if (insErr) throw new Error(insErr.message);
+        }
       }
     } catch (err) {
       // Non-fatal — insights are advisory.
-      console.warn(`[oura-sync] insight generation failed for ${userId}:`, (err as Error).message);
+      console.warn(`[oura-sync] insight persistence failed for ${userId}:`, (err as Error).message);
     }
 
     // 6. Mark success.
