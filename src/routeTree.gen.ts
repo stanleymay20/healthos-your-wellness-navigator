@@ -25,6 +25,7 @@ import { Route as AppLogsRouteImport } from './routes/_app/logs'
 import { Route as AppInsightsRouteImport } from './routes/_app/insights'
 import { Route as AppDevicesRouteImport } from './routes/_app/devices'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as ApiAdminBackfillScoresRouteImport } from './routes/api/admin/backfill-scores'
 import { Route as ApiIntegrationsOuraSyncRouteImport } from './routes/api/integrations/oura/sync'
 import { Route as ApiIntegrationsOuraCallbackRouteImport } from './routes/api/integrations/oura/callback'
 
@@ -107,6 +108,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiAdminBackfillScoresRoute = ApiAdminBackfillScoresRouteImport.update({
+  id: '/api/admin/backfill-scores',
+  path: '/api/admin/backfill-scores',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIntegrationsOuraSyncRoute = ApiIntegrationsOuraSyncRouteImport.update({
   id: '/api/integrations/oura/sync',
   path: '/api/integrations/oura/sync',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/plan': typeof AppPlanRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/plan': typeof AppPlanRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/_app/plan': typeof AppPlanRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/reports'
     | '/settings'
+    | '/api/admin/backfill-scores'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
   fileRoutesByTo: FileRoutesByTo
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/reports'
     | '/settings'
+    | '/api/admin/backfill-scores'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
   id:
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/_app/plan'
     | '/_app/reports'
     | '/_app/settings'
+    | '/api/admin/backfill-scores'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
   fileRoutesById: FileRoutesById
@@ -248,6 +260,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiAdminBackfillScoresRoute: typeof ApiAdminBackfillScoresRoute
   ApiIntegrationsOuraCallbackRoute: typeof ApiIntegrationsOuraCallbackRoute
   ApiIntegrationsOuraSyncRoute: typeof ApiIntegrationsOuraSyncRoute
 }
@@ -366,6 +379,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/admin/backfill-scores': {
+      id: '/api/admin/backfill-scores'
+      path: '/api/admin/backfill-scores'
+      fullPath: '/api/admin/backfill-scores'
+      preLoaderRoute: typeof ApiAdminBackfillScoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/integrations/oura/sync': {
       id: '/api/integrations/oura/sync'
       path: '/api/integrations/oura/sync'
@@ -416,6 +436,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiAdminBackfillScoresRoute: ApiAdminBackfillScoresRoute,
   ApiIntegrationsOuraCallbackRoute: ApiIntegrationsOuraCallbackRoute,
   ApiIntegrationsOuraSyncRoute: ApiIntegrationsOuraSyncRoute,
 }
