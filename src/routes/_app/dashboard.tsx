@@ -437,16 +437,27 @@ function WeeklyInsightCard({ scores }: { scores: HealthScore[] }) {
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Weekly Insight</p>
         <p className="text-sm font-semibold mt-0.5">{text}</p>
-        {daily.length > 0 && (
+        {daily.length > 0 ? (
           <ul className="mt-2 space-y-1">
-            {daily.map((line) => (
-              <li key={line} className="text-xs text-muted-foreground flex gap-1.5">
+            {daily.map((line, idx) => (
+              <li
+                key={line}
+                className={
+                  idx === 0
+                    ? "text-sm font-semibold text-foreground flex gap-1.5"
+                    : "text-xs text-muted-foreground flex gap-1.5"
+                }
+              >
                 <span className="text-accent" aria-hidden>•</span>
                 <span>{line}</span>
               </li>
             ))}
           </ul>
-        )}
+        ) : scores.length === 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Sync your device or log data to get personalized insights.
+          </p>
+        ) : null}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { devices } from "@/lib/mock-data";
-import { Watch, CheckCircle2, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { Watch, CheckCircle2, Loader2, RefreshCw, AlertCircle, Sparkles, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { isIntegratedProvider } from "@/lib/providers";
@@ -33,6 +33,13 @@ async function fetchLatestInsightTitle(userId: string): Promise<string | null> {
   return data?.title ?? null;
 }
 
+type LastSyncResult = {
+  provider: string;
+  daysWritten: number;
+  syncedAt: string;
+  latestInsight: string | null;
+};
+
 function Devices() {
   const { user, session } = useAuth();
   const navigate = useNavigate();
@@ -40,6 +47,7 @@ function Devices() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState<Set<string>>(new Set());
+  const [lastSync, setLastSync] = useState<LastSyncResult | null>(null);
 
   async function loadRows(userId: string) {
     // sync_error landed in a later migration; the generated types file
@@ -150,9 +158,13 @@ function Devices() {
         const headline = days > 0
           ? `Synced ${days} day${days === 1 ? "" : "s"}.`
           : "Sync complete — no new data.";
-        // Surface a preview of the freshest insight if one exists, and
-        // give the user a one-tap path to the full list.
         const latestInsight = await fetchLatestInsightTitle(user.id);
+        setLastSync({
+          provider,
+          daysWritten: days,
+          syncedAt: new Date().toISOString(),
+          latestInsight,
+        });
         toast.success(headline, {
           description: latestInsight ?? undefined,
           action: {
@@ -180,6 +192,59 @@ function Devices() {
         <h1 className="text-2xl font-bold">Connected Devices</h1>
         <p className="text-sm text-muted-foreground">Sync your wearables and health apps to enrich your insights.</p>
       </header>
+      {lastSync && (
+        <div className="rounded-2xl border border-success/30 bg-success/5 p-5">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-success/15 text-success flex items-center justify-center shrink-0">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-success">
+                  {lastSync.daysWritten > 0
+                    ? `Synced ${lastSync.daysWritten} day${lastSync.daysWritten === 1 ? "" : "s"} from ${lastSync.provider}`
+                    : `Your ${lastSync.provider} data is up to date`}
+                </p>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(lastSync.syncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-foreground/80">
+                {lastSync.latestInsight
+                  ? `We analyzed your recent data: ${lastSync.latestInsight}`
+                  : "Your health data is fresh. Check your dashboard for the latest trends."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-full bg-gradient-brand text-primary-foreground"
+                  onClick={() =>
+                    navigate({ to: "/insights", search: { synced: 1 } as never })
+                  }
+                >
+                  View your insights <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => navigate({ to: "/dashboard" })}
+                >
+                  Go to dashboard
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-full text-muted-foreground"
+                  onClick={() => setLastSync(null)}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
       ) : (
