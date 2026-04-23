@@ -10,6 +10,7 @@ import {
 } from "./oura";
 import { deriveDailyScores, type SnapshotInput } from "@/lib/scoring/derive";
 import { persistDerivedScores } from "@/lib/scoring/persist.server";
+import { generateInsights } from "@/lib/insights/generate";
 
 const PROVIDER = "oura" as const;
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -247,6 +248,25 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     }));
     const derived = deriveDailyScores(derivationInputs);
     const { daysWritten } = await persistDerivedScores(userId, derived);
+
+    // 5b. Generate quick post-sync insights from the two most recent score
+    //     rows. Temporary surface: console-only; no DB write, no return
+    //     shape change.
+    try {
+      const { data: recent } = await admin
+        .from("health_scores")
+        .select("score_date, overall_score, sleep_score, activity_score")
+        .eq("user_id", userId)
+        .order("score_date", { ascending: false })
+        .limit(2);
+      const insights = generateInsights((recent ?? []) as Parameters<typeof generateInsights>[0]);
+      if (insights.length > 0) {
+        console.log(`[oura-sync] insights for ${userId}:`, insights);
+      }
+    } catch (err) {
+      // Non-fatal — insights are advisory.
+      console.warn(`[oura-sync] insight generation failed for ${userId}:`, (err as Error).message);
+    }
 
     // 6. Mark success.
     const { error: connUpdateErr } = await admin
