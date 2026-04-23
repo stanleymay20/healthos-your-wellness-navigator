@@ -6,8 +6,8 @@ interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ session: Session | null; error: Error | null }>;
+  signUp: (email: string, password: string, fullName?: string) => Promise<{ session: Session | null; error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
 }
@@ -44,13 +44,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     loading,
     signIn: async (email, password) => {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error: error as Error | null };
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      return { session: data?.session ?? null, error: error as Error | null };
     },
     signUp: async (email, password, fullName) => {
+      // Point confirmation links back to /auth so the user lands on a page
+      // that knows how to handle the post-confirmation state, rather than
+      // /dashboard which bounces to /auth when the session isn't ready yet.
       const redirectTo =
-        typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined;
-      const { error } = await supabase.auth.signUp({
+        typeof window !== "undefined" ? `${window.location.origin}/auth?confirmed=1` : undefined;
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -58,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: fullName ? { full_name: fullName } : undefined,
         },
       });
-      return { error: error as Error | null };
+      return { session: data?.session ?? null, error: error as Error | null };
     },
     signOut: async () => {
       await supabase.auth.signOut();

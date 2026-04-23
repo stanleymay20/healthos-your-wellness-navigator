@@ -4,8 +4,9 @@ import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowRight, Loader2, ShieldCheck, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getOnboardingStatus } from "@/lib/onboarding";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -21,11 +22,45 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  // When signup succeeds but email confirmation is required, Supabase
+  // returns user=null,session=null. We stay on this page and show an
+  // explicit "check your inbox" state instead of redirecting to a
+  // dashboard that will just bounce the user right back.
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user, signIn, signUp, resetPassword } = useAuth();
 
+  // Handle the return from a confirmation email and route existing
+  // sessions via the onboarding gate so users with incomplete profiles
+  // don't flash the dashboard on their way to /onboarding.
   useEffect(() => {
-    if (user) navigate({ to: "/dashboard" });
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("confirmed") === "1") {
+        toast.success("Email confirmed. Sign in to continue.");
+        params.delete("confirmed");
+        const qs = params.toString();
+        window.history.replaceState(
+          {},
+          "",
+          window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash,
+        );
+      }
+    }
+    if (!user) return;
+    let active = true;
+    (async () => {
+      try {
+        const status = await getOnboardingStatus(user.id);
+        if (!active) return;
+        navigate({ to: status.complete ? "/dashboard" : "/onboarding" });
+      } catch {
+        if (active) navigate({ to: "/dashboard" });
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,13 +71,22 @@ function AuthPage() {
         const { error } = await signIn(email, password);
         if (error) throw error;
         toast.success("Welcome back!");
-        navigate({ to: "/dashboard" });
+        // Route via onboarding status so incomplete profiles don't
+        // flash the dashboard before being redirected.
+        // user state will update via onAuthStateChange; the effect
+        // above handles the navigate.
       } else if (mode === "signup") {
-        const { error } = await signUp(email, password, fullName);
+        const { session, error } = await signUp(email, password, fullName);
         if (error) throw error;
-        toast.success("Account created. Check your email to confirm.");
-        // If email confirmation is disabled, session will exist immediately
-        navigate({ to: "/dashboard" });
+        if (!session) {
+          // Email confirmation required — stay on this page with a
+          // clear "check your inbox" state instead of a silent redirect.
+          setAwaitingConfirmation(email);
+          toast.success("Account created. Check your email to confirm.");
+        } else {
+          toast.success("Account created.");
+          // Same route-via-onboarding pathway as sign-in.
+        }
       } else {
         const { error } = await resetPassword(email);
         if (error) throw error;
@@ -92,6 +136,24 @@ function AuthPage() {
           <div className="lg:hidden mb-8"><Link to="/"><Logo /></Link></div>
           <h1 className="text-3xl font-bold">{title}</h1>
           <p className="mt-2 text-muted-foreground">{subtitle}</p>
+          {awaitingConfirmation && (
+            <div className="mt-6 rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-start gap-3">
+              <Mail className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">Check your inbox</p>
+                <p className="text-xs text-muted-foreground mt-1 break-words">
+                  We sent a confirmation link to <span className="font-semibold">{awaitingConfirmation}</span>. Open it to activate your account, then sign in here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setAwaitingConfirmation(null); setMode("signin"); }}
+                  className="mt-2 text-xs text-primary font-semibold hover:underline"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            </div>
+          )}
           <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
             {mode === "signup" && (
               <div className="space-y-2">
@@ -137,7 +199,7 @@ function AuthPage() {
             )}
           </p>
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <ShieldCheck className="h-3 w-3" /> Bank-level encryption · GDPR compliant
+            <ShieldCheck className="h-3 w-3" /> Encrypted in transit and at rest
           </div>
         </div>
       </div>
