@@ -16,6 +16,7 @@ import {
   type HealthLog, type HealthScore, type Recommendation,
 } from "@/services/health";
 import { scoreLabel } from "@/services/scoring";
+import { generateInsights } from "@/lib/insights/generate";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -420,14 +421,32 @@ function WeeklyInsightCard({ scores }: { scores: HealthScore[] }) {
     : delta < -2
       ? `Score dipped ${Math.abs(delta).toFixed(0)} pts — let's reset this week`
       : "Steady week. Consistency builds resilience.";
+  const daily = generateInsights(
+    scores.map((s) => ({
+      score_date: s.score_date,
+      overall_score: s.overall_score,
+      sleep_score: s.sleep_score,
+      activity_score: s.activity_score,
+    })),
+  );
   return (
-    <div className="rounded-2xl bg-card border border-border shadow-card p-6 flex items-center gap-4">
-      <div className="h-12 w-12 rounded-xl bg-accent-soft/60 flex items-center justify-center text-accent">
+    <div className="rounded-2xl bg-card border border-border shadow-card p-6 flex items-start gap-4">
+      <div className="h-12 w-12 rounded-xl bg-accent-soft/60 flex items-center justify-center text-accent shrink-0">
         <Lightbulb className="h-5 w-5" />
       </div>
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Weekly Insight</p>
         <p className="text-sm font-semibold mt-0.5">{text}</p>
+        {daily.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {daily.map((line) => (
+              <li key={line} className="text-xs text-muted-foreground flex gap-1.5">
+                <span className="text-accent" aria-hidden>•</span>
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
