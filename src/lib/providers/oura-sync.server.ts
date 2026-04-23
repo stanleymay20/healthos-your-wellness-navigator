@@ -8,6 +8,7 @@ import {
   refreshAccessToken,
   RefreshTokenInvalidError,
 } from "./oura";
+import { deriveDailyScores, type SnapshotInput } from "@/lib/scoring/derive";
 
 const PROVIDER = "oura" as const;
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -73,18 +74,6 @@ async function fetchDaily(
       score: typeof d.score === "number" ? d.score : null,
       raw: d,
     }));
-}
-
-function indexByDay(points: DailyPoint[]): Map<string, number | null> {
-  const m = new Map<string, number | null>();
-  for (const p of points) m.set(p.day, p.score);
-  return m;
-}
-
-function avgPresent(values: Array<number | null | undefined>): number | null {
-  const present = values.filter((v): v is number => typeof v === "number");
-  if (present.length === 0) return null;
-  return Math.round(present.reduce((a, b) => a + b, 0) / present.length);
 }
 
 function buildSnapshotRows(
@@ -227,16 +216,6 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       }
     }
 
-    const sleepByDay = indexByDay(sleep);
-    const readyByDay = indexByDay(readiness);
-    const actByDay = indexByDay(activity);
-
-    const allDays = new Set<string>([
-      ...sleepByDay.keys(),
-      ...readyByDay.keys(),
-      ...actByDay.keys(),
-    ]);
-
     // 5a. Persist raw snapshots for every fetched day, regardless of whether
     //     we can compute a health_scores row from them. This is a dual-write
     //     alongside the existing health_scores upsert — later phases can
@@ -255,24 +234,24 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       if (snapErr) throw new Error(`snapshot upsert failed: ${snapErr.message}`);
     }
 
-    // 5. Upsert one health_scores row per day with at least one signal.
-    //    UNIQUE (user_id, score_date) makes upsert idempotent.
-    const rows: Array<Record<string, unknown>> = [];
-    for (const day of allDays) {
-      const sleepScore = sleepByDay.get(day) ?? null;
-      const recoveryScore = readyByDay.get(day) ?? null;
-      const activityScore = actByDay.get(day) ?? null;
-      const overall = avgPresent([sleepScore, recoveryScore, activityScore]);
-      if (overall === null) continue;
-      rows.push({
-        user_id: userId,
-        score_date: day,
-        overall_score: overall,
-        sleep_score: sleepScore,
-        recovery_score: recoveryScore,
-        activity_score: activityScore,
-      });
-    }
+    // 5. Derive health_scores rows via the shared pure rule, then upsert.
+    //    UNIQUE (user_id, score_date) makes the upsert idempotent. Feeding
+    //    the in-memory snapshot inputs through deriveDailyScores produces
+    //    byte-identical output to the previous inline computation.
+    const derivationInputs: SnapshotInput[] = snapshotRows.map((r) => ({
+      record_date: r.record_date as string,
+      record_type: r.record_type as SnapshotInput["record_type"],
+      score: (r.score as number | null) ?? null,
+    }));
+    const derived = deriveDailyScores(derivationInputs);
+    const rows: Array<Record<string, unknown>> = derived.map((d) => ({
+      user_id: userId,
+      score_date: d.score_date,
+      overall_score: d.overall_score,
+      sleep_score: d.sleep_score,
+      recovery_score: d.recovery_score,
+      activity_score: d.activity_score,
+    }));
 
     if (rows.length > 0) {
       const { error: upsertErr } = await admin
