@@ -9,6 +9,7 @@ import {
   RefreshTokenInvalidError,
 } from "./oura";
 import { deriveDailyScores, type SnapshotInput } from "@/lib/scoring/derive";
+import { persistDerivedScores } from "@/lib/scoring/persist.server";
 
 const PROVIDER = "oura" as const;
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -234,31 +235,18 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       if (snapErr) throw new Error(`snapshot upsert failed: ${snapErr.message}`);
     }
 
-    // 5. Derive health_scores rows via the shared pure rule, then upsert.
-    //    UNIQUE (user_id, score_date) makes the upsert idempotent. Feeding
-    //    the in-memory snapshot inputs through deriveDailyScores produces
-    //    byte-identical output to the previous inline computation.
+    // 5. Derive health_scores rows via the shared pure rule, then delegate
+    //    persistence to persistDerivedScores — the same writer used by the
+    //    backfill path. Behavior is unchanged: same upsert key, same
+    //    idempotency, same error shape. This removes the duplicated inline
+    //    upsert from the live sync.
     const derivationInputs: SnapshotInput[] = snapshotRows.map((r) => ({
       record_date: r.record_date as string,
       record_type: r.record_type as SnapshotInput["record_type"],
       score: (r.score as number | null) ?? null,
     }));
     const derived = deriveDailyScores(derivationInputs);
-    const rows: Array<Record<string, unknown>> = derived.map((d) => ({
-      user_id: userId,
-      score_date: d.score_date,
-      overall_score: d.overall_score,
-      sleep_score: d.sleep_score,
-      recovery_score: d.recovery_score,
-      activity_score: d.activity_score,
-    }));
-
-    if (rows.length > 0) {
-      const { error: upsertErr } = await admin
-        .from("health_scores")
-        .upsert(rows, { onConflict: "user_id,score_date" });
-      if (upsertErr) throw new Error(`health_scores upsert failed: ${upsertErr.message}`);
-    }
+    const { daysWritten } = await persistDerivedScores(userId, derived);
 
     // 6. Mark success.
     const { error: connUpdateErr } = await admin
@@ -273,7 +261,7 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       .eq("provider", PROVIDER);
     if (connUpdateErr) throw new Error(`connection update failed: ${connUpdateErr.message}`);
 
-    return { daysWritten: rows.length, syncedThrough: endDate };
+    return { daysWritten, syncedThrough: endDate };
   } catch (e) {
     // 7. Only flip to disconnected when the token itself is the problem
     //    (401/403 from Oura, or the row is gone). Everything else — network
