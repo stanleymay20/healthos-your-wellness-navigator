@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AboutRouteImport } from './routes/about'
@@ -24,6 +25,10 @@ import { Route as AppLogsRouteImport } from './routes/_app/logs'
 import { Route as AppInsightsRouteImport } from './routes/_app/insights'
 import { Route as AppDevicesRouteImport } from './routes/_app/devices'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as ApiAdminScoreParityRouteImport } from './routes/api/admin/score-parity'
+import { Route as ApiAdminBackfillScoresRouteImport } from './routes/api/admin/backfill-scores'
+import { Route as ApiIntegrationsOuraSyncRouteImport } from './routes/api/integrations/oura/sync'
+import { Route as ApiIntegrationsOuraCallbackRouteImport } from './routes/api/integrations/oura/callback'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -33,6 +38,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BlogRoute = BlogRouteImport.update({
@@ -99,12 +109,34 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiAdminScoreParityRoute = ApiAdminScoreParityRouteImport.update({
+  id: '/api/admin/score-parity',
+  path: '/api/admin/score-parity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminBackfillScoresRoute = ApiAdminBackfillScoresRouteImport.update({
+  id: '/api/admin/backfill-scores',
+  path: '/api/admin/backfill-scores',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIntegrationsOuraSyncRoute = ApiIntegrationsOuraSyncRouteImport.update({
+  id: '/api/integrations/oura/sync',
+  path: '/api/integrations/oura/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIntegrationsOuraCallbackRoute =
+  ApiIntegrationsOuraCallbackRouteImport.update({
+    id: '/api/integrations/oura/callback',
+    path: '/api/integrations/oura/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/blog': typeof BlogRoute
+  '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/dashboard': typeof AppDashboardRoute
@@ -115,12 +147,17 @@ export interface FileRoutesByFullPath {
   '/plan': typeof AppPlanRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
+  '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
+  '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/blog': typeof BlogRoute
+  '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/dashboard': typeof AppDashboardRoute
@@ -131,6 +168,10 @@ export interface FileRoutesByTo {
   '/plan': typeof AppPlanRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
+  '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
+  '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -139,6 +180,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/blog': typeof BlogRoute
+  '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_app/dashboard': typeof AppDashboardRoute
@@ -149,6 +191,10 @@ export interface FileRoutesById {
   '/_app/plan': typeof AppPlanRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
+  '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
+  '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -157,6 +203,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/blog'
+    | '/onboarding'
     | '/pricing'
     | '/reset-password'
     | '/dashboard'
@@ -167,12 +214,17 @@ export interface FileRouteTypes {
     | '/plan'
     | '/reports'
     | '/settings'
+    | '/api/admin/backfill-scores'
+    | '/api/admin/score-parity'
+    | '/api/integrations/oura/callback'
+    | '/api/integrations/oura/sync'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
     | '/auth'
     | '/blog'
+    | '/onboarding'
     | '/pricing'
     | '/reset-password'
     | '/dashboard'
@@ -183,6 +235,10 @@ export interface FileRouteTypes {
     | '/plan'
     | '/reports'
     | '/settings'
+    | '/api/admin/backfill-scores'
+    | '/api/admin/score-parity'
+    | '/api/integrations/oura/callback'
+    | '/api/integrations/oura/sync'
   id:
     | '__root__'
     | '/'
@@ -190,6 +246,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/blog'
+    | '/onboarding'
     | '/pricing'
     | '/reset-password'
     | '/_app/dashboard'
@@ -200,6 +257,10 @@ export interface FileRouteTypes {
     | '/_app/plan'
     | '/_app/reports'
     | '/_app/settings'
+    | '/api/admin/backfill-scores'
+    | '/api/admin/score-parity'
+    | '/api/integrations/oura/callback'
+    | '/api/integrations/oura/sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -208,8 +269,13 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
   BlogRoute: typeof BlogRoute
+  OnboardingRoute: typeof OnboardingRoute
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiAdminBackfillScoresRoute: typeof ApiAdminBackfillScoresRoute
+  ApiAdminScoreParityRoute: typeof ApiAdminScoreParityRoute
+  ApiIntegrationsOuraCallbackRoute: typeof ApiIntegrationsOuraCallbackRoute
+  ApiIntegrationsOuraSyncRoute: typeof ApiIntegrationsOuraSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -226,6 +292,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/blog': {
@@ -319,6 +392,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/admin/score-parity': {
+      id: '/api/admin/score-parity'
+      path: '/api/admin/score-parity'
+      fullPath: '/api/admin/score-parity'
+      preLoaderRoute: typeof ApiAdminScoreParityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/backfill-scores': {
+      id: '/api/admin/backfill-scores'
+      path: '/api/admin/backfill-scores'
+      fullPath: '/api/admin/backfill-scores'
+      preLoaderRoute: typeof ApiAdminBackfillScoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/oura/sync': {
+      id: '/api/integrations/oura/sync'
+      path: '/api/integrations/oura/sync'
+      fullPath: '/api/integrations/oura/sync'
+      preLoaderRoute: typeof ApiIntegrationsOuraSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/oura/callback': {
+      id: '/api/integrations/oura/callback'
+      path: '/api/integrations/oura/callback'
+      fullPath: '/api/integrations/oura/callback'
+      preLoaderRoute: typeof ApiIntegrationsOuraCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -352,9 +453,23 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
   BlogRoute: BlogRoute,
+  OnboardingRoute: OnboardingRoute,
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiAdminBackfillScoresRoute: ApiAdminBackfillScoresRoute,
+  ApiAdminScoreParityRoute: ApiAdminScoreParityRoute,
+  ApiIntegrationsOuraCallbackRoute: ApiIntegrationsOuraCallbackRoute,
+  ApiIntegrationsOuraSyncRoute: ApiIntegrationsOuraSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

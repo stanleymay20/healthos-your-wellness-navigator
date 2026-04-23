@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, Link, useLocation, useNavigate, redirect } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Logo } from "@/components/brand/Logo";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { getOnboardingStatus } from "@/lib/onboarding";
 import {
   LayoutDashboard, Sparkles, Activity, Target, NotebookPen,
   FileText, Watch, Settings, Bell, ChevronDown, Calendar, LogOut, Loader2,
@@ -35,12 +36,36 @@ function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
   }, [user, loading, navigate]);
 
-  if (loading || !user) {
+  useEffect(() => {
+    if (loading || !user) return;
+    let active = true;
+    setOnboardingChecked(false);
+    (async () => {
+      try {
+        const { complete } = await getOnboardingStatus(user.id);
+        if (!active) return;
+        if (!complete) {
+          navigate({ to: "/onboarding" });
+          return;
+        }
+        setOnboardingChecked(true);
+      } catch {
+        // Don't trap the user on the spinner if the check itself fails.
+        if (active) setOnboardingChecked(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user, loading, navigate]);
+
+  if (loading || !user || !onboardingChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />

@@ -16,6 +16,7 @@ import {
   type HealthLog, type HealthScore, type Recommendation,
 } from "@/services/health";
 import { scoreLabel } from "@/services/scoring";
+import { generateInsights } from "@/lib/insights/generate";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -44,7 +45,26 @@ function Dashboard() {
     }
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+    const onFocus = () => refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  async function handleRecAction(id: string, status: Recommendation["status"]) {
+    const prev = recs;
+    const completed_at = status === "done" ? new Date().toISOString() : null;
+    setRecs((cur) => cur.map((r) => (r.id === id ? { ...r, status, completed_at } : r)));
+    try {
+      await updateRecommendationStatus(id, status);
+      toast.success(status === "done" ? "Marked as done" : status === "snoozed" ? "Snoozed" : "Dismissed");
+      await refresh();
+    } catch (e) {
+      setRecs(prev);
+      toast.error((e as Error).message);
+    }
+  }
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -72,7 +92,7 @@ function Dashboard() {
       <div className="grid gap-5 lg:grid-cols-3">
         <BreakdownCard score={todayScore} />
         <RecentLogsCard logs={logs} />
-        <RecommendationCard rec={recs[0] ?? null} onUpdate={refresh} />
+        <RecommendationCard rec={recs.find((r) => r.status === "pending") ?? null} onAction={handleRecAction} />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-4">
@@ -348,7 +368,9 @@ function RecentLogsCard({ logs }: { logs: HealthLog[] }) {
   );
 }
 
-function RecommendationCard({ rec, onUpdate }: { rec: Recommendation | null; onUpdate: () => void }) {
+function RecommendationCard({ rec, onAction }: { rec: Recommendation | null; onAction: (id: string, status: Recommendation["status"]) => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+
   if (!rec) {
     return (
       <div className="rounded-2xl bg-gradient-dark text-white p-6 shadow-elegant">
@@ -362,12 +384,12 @@ function RecommendationCard({ rec, onUpdate }: { rec: Recommendation | null; onU
   }
 
   async function handle(status: Recommendation["status"]) {
+    if (busy) return;
+    setBusy(true);
     try {
-      await updateRecommendationStatus(rec!.id, status);
-      toast.success(status === "done" ? "Marked as done" : status === "snoozed" ? "Snoozed" : "Dismissed");
-      onUpdate();
-    } catch (e) {
-      toast.error((e as Error).message);
+      await onAction(rec!.id, status);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -380,9 +402,9 @@ function RecommendationCard({ rec, onUpdate }: { rec: Recommendation | null; onU
       <h3 className="mt-3 text-2xl font-bold leading-tight">{rec.title}</h3>
       <p className="mt-3 text-sm text-white/70 leading-relaxed">{rec.description}</p>
       <div className="mt-6 flex flex-wrap gap-2">
-        <Button onClick={() => handle("done")} className="bg-accent text-accent-foreground hover:opacity-95 rounded-full font-semibold">Mark as Done</Button>
-        <Button onClick={() => handle("snoozed")} variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 rounded-full">Not Now</Button>
-        <Button onClick={() => handle("dismissed")} variant="ghost" className="text-white/70 hover:text-white hover:bg-white/5 rounded-full">Dismiss</Button>
+        <Button disabled={busy} onClick={() => handle("done")} className="bg-accent text-accent-foreground hover:opacity-95 rounded-full font-semibold">Mark as Done</Button>
+        <Button disabled={busy} onClick={() => handle("snoozed")} variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 rounded-full">Not Now</Button>
+        <Button disabled={busy} onClick={() => handle("dismissed")} variant="ghost" className="text-white/70 hover:text-white hover:bg-white/5 rounded-full">Dismiss</Button>
       </div>
     </div>
   );
@@ -399,14 +421,43 @@ function WeeklyInsightCard({ scores }: { scores: HealthScore[] }) {
     : delta < -2
       ? `Score dipped ${Math.abs(delta).toFixed(0)} pts — let's reset this week`
       : "Steady week. Consistency builds resilience.";
+  const daily = generateInsights(
+    scores.map((s) => ({
+      score_date: s.score_date,
+      overall_score: s.overall_score,
+      sleep_score: s.sleep_score,
+      activity_score: s.activity_score,
+    })),
+  );
   return (
-    <div className="rounded-2xl bg-card border border-border shadow-card p-6 flex items-center gap-4">
-      <div className="h-12 w-12 rounded-xl bg-accent-soft/60 flex items-center justify-center text-accent">
+    <div className="rounded-2xl bg-card border border-border shadow-card p-6 flex items-start gap-4">
+      <div className="h-12 w-12 rounded-xl bg-accent-soft/60 flex items-center justify-center text-accent shrink-0">
         <Lightbulb className="h-5 w-5" />
       </div>
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Weekly Insight</p>
         <p className="text-sm font-semibold mt-0.5">{text}</p>
+        {daily.length > 0 ? (
+          <ul className="mt-2 space-y-1">
+            {daily.map((line, idx) => (
+              <li
+                key={line}
+                className={
+                  idx === 0
+                    ? "text-sm font-semibold text-foreground flex gap-1.5"
+                    : "text-xs text-muted-foreground flex gap-1.5"
+                }
+              >
+                <span className="text-accent" aria-hidden>•</span>
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        ) : scores.length === 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Sync your device or log data to get personalized insights.
+          </p>
+        ) : null}
       </div>
     </div>
   );
