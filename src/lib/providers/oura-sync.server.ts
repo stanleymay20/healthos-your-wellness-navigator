@@ -11,43 +11,106 @@ import {
 import { deriveDailyScores, type SnapshotInput } from "@/lib/scoring/derive";
 import { persistDerivedScores } from "@/lib/scoring/persist.server";
 import { generateInsights } from "@/lib/insights/generate";
+import {
+  computeBaseline,
+  computeDeviation,
+  type BaselineScoreInput,
+} from "@/lib/scoring/baseline";
 
 const PROVIDER = "oura" as const;
 const DEFAULT_LOOKBACK_DAYS = 14;
 // Refresh tokens whose access_token expires within this window, so we avoid
 // burning a request on a near-dead token.
 const EXPIRY_SKEW_MS = 60_000;
+// How many recent score rows we read for baseline + insight context.
+// Latest is the day we're evaluating; the rest form the baseline window.
+const INSIGHT_CONTEXT_DAYS = 15;
 
-// Canonical sync-generated insights. Keyed by the exact title string the
-// pure generator emits; lets us (a) enrich with description/type/severity
-// and (b) scope the idempotent delete to this set of titles only.
+// Canonical sync-generated insights. Some titles are exact strings; some
+// are stems matched by prefix (the generator emits dynamic σ values for
+// baseline-aware insights, so we can't enumerate every full title). Each
+// entry's `match` is either a literal full title or a prefix.
 type InsightTone = "positive" | "warning" | "neutral";
 type InsightLevel = "low" | "medium" | "high";
-const SYNC_INSIGHT_CATALOG: Record<
-  string,
-  { description: string; type: InsightTone; severity: InsightLevel }
-> = {
-  "Your recovery is low. Prioritize rest today.": {
+type CatalogEntry = {
+  match: string;
+  matchType: "exact" | "prefix";
+  description: string;
+  type: InsightTone;
+  severity: InsightLevel;
+};
+const SYNC_INSIGHT_CATALOG: CatalogEntry[] = [
+  // Baseline-aware (prefix matches; titles include dynamic σ values).
+  {
+    match: "Sleep is",
+    matchType: "prefix",
+    description: "Tonight's sleep score is well below your usual range. Protect your wind-down window.",
+    type: "warning",
+    severity: "high",
+  },
+  {
+    match: "Recovery is",
+    matchType: "prefix",
+    description: "Your recovery signal has dropped relative to your recent baseline. A lighter day and earlier sleep can reset it.",
+    type: "warning",
+    severity: "high",
+  },
+  {
+    match: "Activity is",
+    matchType: "prefix",
+    description: "Your activity has dropped relative to your recent baseline. Even short, gentle movement helps.",
+    type: "warning",
+    severity: "medium",
+  },
+  {
+    match: "You're well above your recent baseline",
+    matchType: "prefix",
+    description: "Your overall score is meaningfully above your recent baseline. Keep the current routine and momentum compounds.",
+    type: "positive",
+    severity: "low",
+  },
+  // Fixed-threshold fallbacks (exact matches, identical to pre-baseline behavior).
+  {
+    match: "Your recovery is low. Prioritize rest today.",
+    matchType: "exact",
     description: "Latest overall score is below 50. Consider a lighter day and earlier wind-down.",
     type: "warning",
     severity: "high",
   },
-  "Your sleep quality dropped. Consider earlier sleep.": {
+  {
+    match: "Your sleep quality dropped. Consider earlier sleep.",
+    matchType: "exact",
     description: "Sleep score fell below 60. Protecting an earlier wind-down tonight can rebuild the baseline.",
     type: "warning",
     severity: "medium",
   },
-  "Low activity detected. Try light movement today.": {
+  {
+    match: "Low activity detected. Try light movement today.",
+    matchType: "exact",
     description: "Activity score is below 50. A short walk or mobility session can lift today's signal.",
     type: "warning",
     severity: "medium",
   },
-  "You're improving. Keep your routine consistent.": {
+  {
+    match: "You're improving. Keep your routine consistent.",
+    matchType: "exact",
     description: "Overall score improved versus the previous day. Consistency is compounding.",
     type: "positive",
     severity: "low",
   },
-};
+];
+
+function lookupCatalog(title: string): CatalogEntry | null {
+  // Prefer exact matches; otherwise pick the longest matching prefix.
+  const exact = SYNC_INSIGHT_CATALOG.find(
+    (c) => c.matchType === "exact" && c.match === title,
+  );
+  if (exact) return exact;
+  const prefixes = SYNC_INSIGHT_CATALOG.filter(
+    (c) => c.matchType === "prefix" && title.startsWith(c.match),
+  ).sort((a, b) => b.match.length - a.match.length);
+  return prefixes[0] ?? null;
+}
 
 // Thrown only when the upstream signal clearly indicates the stored token
 // is no longer usable (revoked, expired beyond refresh, scope stripped,
@@ -280,23 +343,39 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     const derived = deriveDailyScores(derivationInputs);
     const { daysWritten } = await persistDerivedScores(userId, derived);
 
-    // 5b. Generate post-sync insights from the two most recent score rows
-    //     and persist them under the existing insights table. Idempotent
-    //     across repeated syncs on the same day: delete today's rows with
-    //     known sync-generated titles, then insert the fresh batch.
+    // 5b. Generate post-sync insights with adaptive-baseline context, then
+    //     persist them under public.insights. Idempotent across repeated
+    //     syncs on the same day: delete today's sync-generated rows
+    //     (matched against the catalog so we don't clobber insights from
+    //     the manual-log engine flow), then insert the fresh batch.
     //     Failures are non-fatal — insights are advisory.
     try {
       const { data: recent } = await admin
         .from("health_scores")
-        .select("score_date, overall_score, sleep_score, activity_score")
+        .select("score_date, overall_score, sleep_score, recovery_score, activity_score")
         .eq("user_id", userId)
         .order("score_date", { ascending: false })
-        .limit(2);
-      const insights = generateInsights((recent ?? []) as Parameters<typeof generateInsights>[0]);
+        .limit(INSIGHT_CONTEXT_DAYS);
+      const recentRows = (recent ?? []) as BaselineScoreInput[];
+
+      const baseline = computeBaseline(recentRows);
+      const deviation =
+        baseline && recentRows.length > 0
+          ? computeDeviation(recentRows[0], baseline)
+          : null;
+
+      const insightInputs = recentRows.map((r) => ({
+        score_date: r.score_date,
+        overall_score: r.overall_score,
+        sleep_score: r.sleep_score,
+        activity_score: r.activity_score,
+      }));
+      const insights = generateInsights(insightInputs, { baseline, deviation });
+
       if (insights.length > 0) {
         const rows = insights
           .map((title) => {
-            const meta = SYNC_INSIGHT_CATALOG[title];
+            const meta = lookupCatalog(title);
             if (!meta) return null;
             return {
               user_id: userId,
@@ -308,14 +387,24 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
           })
           .filter((r): r is NonNullable<typeof r> => r !== null);
 
+        // Two-query delete: pull today's existing rows, filter to ones whose
+        // titles match the catalog, then delete by id. More robust than a
+        // PostgREST .or() filter when titles contain dots / apostrophes /
+        // dynamic values.
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
-        await admin
+        const { data: existing } = await admin
           .from("insights")
-          .delete()
+          .select("id, title")
           .eq("user_id", userId)
-          .gte("created_at", startOfToday.toISOString())
-          .in("title", Object.keys(SYNC_INSIGHT_CATALOG));
+          .gte("created_at", startOfToday.toISOString());
+
+        const ids = ((existing ?? []) as Array<{ id: string; title: string }>)
+          .filter((r) => lookupCatalog(r.title) !== null)
+          .map((r) => r.id);
+        if (ids.length > 0) {
+          await admin.from("insights").delete().in("id", ids);
+        }
 
         if (rows.length > 0) {
           const { error: insErr } = await admin.from("insights").insert(rows);

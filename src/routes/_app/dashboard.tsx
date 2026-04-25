@@ -17,6 +17,13 @@ import {
 } from "@/services/health";
 import { scoreLabel } from "@/services/scoring";
 import { generateInsights } from "@/lib/insights/generate";
+import {
+  computeBaseline,
+  computeDeviation,
+  computeRisk,
+  type BaselineScoreInput,
+  type RiskReport,
+} from "@/lib/scoring/baseline";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -213,17 +220,42 @@ function TrendsCard({ data }: { data: Array<{ day: string; score: number }> }) {
 }
 
 function RiskForecastCard({ scores }: { scores: HealthScore[] }) {
+  const baselineRows: BaselineScoreInput[] = scores.map((s) => ({
+    score_date: s.score_date,
+    overall_score: s.overall_score,
+    sleep_score: s.sleep_score,
+    recovery_score: s.recovery_score,
+    activity_score: s.activity_score,
+  }));
+  const baseline = computeBaseline(baselineRows);
+  const report: RiskReport | null =
+    baseline && baselineRows.length > 0
+      ? computeRisk(computeDeviation(baselineRows[0], baseline))
+      : null;
+  const label = report
+    ? report.level === "low"
+      ? "Low"
+      : report.level === "elevated"
+        ? "Elevated"
+        : "High"
+    : "Not enough data";
+  const tone = !report
+    ? "text-muted-foreground"
+    : report.level === "low"
+      ? "text-success"
+      : report.level === "elevated"
+        ? "text-warning"
+        : "text-destructive";
+  const summary = report ? report.summary : "Log a few more days to establish your baseline.";
+  // Sparkline keeps showing overall trend (not stress-derived) so the card
+  // matches the dimension the risk now references.
   const recent = scores.slice(0, 7);
-  const avgStress = recent.length ? recent.reduce((a, b) => a + (b.stress_score ?? 60), 0) / recent.length : 60;
-  // High stress score = low stress = low risk
-  const risk = avgStress >= 75 ? "Low" : avgStress >= 55 ? "Moderate" : "Elevated";
-  const tone = risk === "Low" ? "text-success" : risk === "Moderate" ? "text-warning" : "text-destructive";
-  const data = recent.slice().reverse().map((s, i) => ({ i, v: 100 - (s.stress_score ?? 60) }));
+  const data = recent.slice().reverse().map((s, i) => ({ i, v: s.overall_score }));
   return (
     <div className="rounded-2xl bg-card border border-border shadow-card p-6">
       <h3 className="font-semibold">Risk Forecast</h3>
-      <p className={`mt-3 text-3xl font-bold ${tone}`}>{risk}</p>
-      <p className="text-sm text-muted-foreground mt-1">Based on your last 7 days of stress signals</p>
+      <p className={`mt-3 text-3xl font-bold ${tone}`}>{label}</p>
+      <p className="text-sm text-muted-foreground mt-1">{summary}</p>
       <div className="mt-3 h-16">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
@@ -421,6 +453,18 @@ function WeeklyInsightCard({ scores }: { scores: HealthScore[] }) {
     : delta < -2
       ? `Score dipped ${Math.abs(delta).toFixed(0)} pts — let's reset this week`
       : "Steady week. Consistency builds resilience.";
+  const baselineRows: BaselineScoreInput[] = scores.map((s) => ({
+    score_date: s.score_date,
+    overall_score: s.overall_score,
+    sleep_score: s.sleep_score,
+    recovery_score: s.recovery_score,
+    activity_score: s.activity_score,
+  }));
+  const baseline = computeBaseline(baselineRows);
+  const deviation =
+    baseline && baselineRows.length > 0
+      ? computeDeviation(baselineRows[0], baseline)
+      : null;
   const daily = generateInsights(
     scores.map((s) => ({
       score_date: s.score_date,
@@ -428,6 +472,7 @@ function WeeklyInsightCard({ scores }: { scores: HealthScore[] }) {
       sleep_score: s.sleep_score,
       activity_score: s.activity_score,
     })),
+    { baseline, deviation },
   );
   return (
     <div className="rounded-2xl bg-card border border-border shadow-card p-6 flex items-start gap-4">
