@@ -63,6 +63,88 @@ function Settings() {
   const [healthGoal, setHealthGoal] = useState<string>("");
   const [unitSystem, setUnitSystem] = useState<UnitSystem>("metric");
   const [notifs, setNotifs] = useState<NotificationPrefs>(DEFAULT_NOTIFS);
+  const [pendingDeleteAt, setPendingDeleteAt] = useState<string | null>(null);
+  const [deletionBusy, setDeletionBusy] = useState(false);
+
+  async function refreshDeletionState(userId: string) {
+    // account_deletions isn't in the generated Supabase types yet;
+    // cast at the boundary (matches the pattern used in server-only files
+    // for tables added after the last codegen).
+    const client = supabase as unknown as { from: (t: string) => any };
+    const { data } = await client
+      .from("account_deletions")
+      .select("scheduled_for, cancelled_at, executed_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const row = data as
+      | { scheduled_for: string; cancelled_at: string | null; executed_at: string | null }
+      | null;
+    if (row && !row.cancelled_at && !row.executed_at) {
+      setPendingDeleteAt(row.scheduled_for);
+    } else {
+      setPendingDeleteAt(null);
+    }
+  }
+
+  async function requestDeletion() {
+    const accessToken = session?.access_token;
+    if (!user || !accessToken) {
+      toast.error("Not signed in.");
+      return;
+    }
+    if (!window.confirm(
+      "Schedule your account for deletion in 30 days?\n\n" +
+      "Your data stays intact during the grace period and you can undo at any time before then.",
+    )) return;
+    setDeletionBusy(true);
+    try {
+      const res = await fetch("/api/me/delete", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ confirm: true }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body?.ok) {
+        toast.error((body?.error as string) || `Could not schedule deletion (${res.status})`);
+        return;
+      }
+      setPendingDeleteAt(body.scheduledFor as string);
+      toast.success("Account scheduled for deletion. You can undo any time before then.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDeletionBusy(false);
+    }
+  }
+
+  async function cancelDeletion() {
+    const accessToken = session?.access_token;
+    if (!user || !accessToken) {
+      toast.error("Not signed in.");
+      return;
+    }
+    setDeletionBusy(true);
+    try {
+      const res = await fetch("/api/me/delete", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body?.ok) {
+        toast.error((body?.error as string) || `Could not cancel (${res.status})`);
+        return;
+      }
+      setPendingDeleteAt(null);
+      toast.success("Deletion cancelled. Your account is back to normal.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDeletionBusy(false);
+    }
+  }
 
   async function exportMyData() {
     const accessToken = session?.access_token;
@@ -125,6 +207,8 @@ function Settings() {
         setUnitSystem(data.unit_system);
         setNotifs({ ...DEFAULT_NOTIFS, ...(data.notification_preferences as Partial<NotificationPrefs>) });
       }
+      // Best-effort: surface a pending deletion if one exists.
+      try { await refreshDeletionState(user.id); } catch { /* ignore */ }
       setLoading(false);
     })();
     return () => {
@@ -234,8 +318,35 @@ function Settings() {
           >
             {exporting ? "Preparing…" : "Export my data"}
           </Button>
-          <Button variant="outline" className="rounded-full text-destructive border-destructive/30">Delete account</Button>
+          {pendingDeleteAt ? (
+            <Button
+              variant="outline"
+              className="rounded-full"
+              onClick={cancelDeletion}
+              disabled={deletionBusy}
+            >
+              {deletionBusy ? "Cancelling…" : "Undo deletion"}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="rounded-full text-destructive border-destructive/30"
+              onClick={requestDeletion}
+              disabled={deletionBusy || !session?.access_token}
+            >
+              {deletionBusy ? "Scheduling…" : "Delete account"}
+            </Button>
+          )}
         </div>
+        {pendingDeleteAt && (
+          <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+            Account scheduled for deletion on{" "}
+            <span className="font-semibold">
+              {new Date(pendingDeleteAt).toLocaleDateString(undefined, { dateStyle: "long" })}
+            </span>
+            . Until then, your data is intact and you can undo at any time.
+          </div>
+        )}
       </Section>
     </div>
   );
