@@ -16,6 +16,7 @@ import {
   computeDeviation,
   type BaselineScoreInput,
 } from "@/lib/scoring/baseline";
+import { logger } from "@/lib/log/logger";
 
 const PROVIDER = "oura" as const;
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -413,7 +414,12 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       }
     } catch (err) {
       // Non-fatal — insights are advisory.
-      console.warn(`[oura-sync] insight persistence failed for ${userId}:`, (err as Error).message);
+      logger.warn({
+        event: "oura_sync.insights.persist_failed",
+        userId,
+        provider: PROVIDER,
+        error: (err as Error).message,
+      });
     }
 
     // 6. Mark success.
@@ -438,6 +444,13 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     //    last_synced_at untouched so the user can see "last success" state.
     const message = (e as Error).message.slice(0, 500);
     const tokenProblem = e instanceof TokenRevokedError;
+    logger.error({
+      event: "oura_sync.failed",
+      userId,
+      provider: PROVIDER,
+      tokenProblem,
+      error: message,
+    });
     await admin
       .from("device_connections")
       .update({

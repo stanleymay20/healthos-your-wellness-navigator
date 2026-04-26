@@ -17,6 +17,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppPlanRouteImport } from './routes/_app/plan'
@@ -69,6 +70,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -160,6 +166,7 @@ export interface FileRoutesByFullPath {
   '/plan': typeof AppPlanRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
@@ -183,6 +190,7 @@ export interface FileRoutesByTo {
   '/plan': typeof AppPlanRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
@@ -208,6 +216,7 @@ export interface FileRoutesById {
   '/_app/plan': typeof AppPlanRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/reports'
     | '/settings'
+    | '/api/health'
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
     | '/api/admin/score-parity'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/reports'
     | '/settings'
+    | '/api/health'
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
     | '/api/admin/score-parity'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/_app/plan'
     | '/_app/reports'
     | '/_app/settings'
+    | '/api/health'
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
     | '/api/admin/score-parity'
@@ -297,6 +309,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   ApiAdminBackfillScoresRoute: typeof ApiAdminBackfillScoresRoute
   ApiAdminOuraSyncCronRoute: typeof ApiAdminOuraSyncCronRoute
   ApiAdminScoreParityRoute: typeof ApiAdminScoreParityRoute
@@ -361,6 +374,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/settings': {
@@ -497,6 +517,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiHealthRoute: ApiHealthRoute,
   ApiAdminBackfillScoresRoute: ApiAdminBackfillScoresRoute,
   ApiAdminOuraSyncCronRoute: ApiAdminOuraSyncCronRoute,
   ApiAdminScoreParityRoute: ApiAdminScoreParityRoute,

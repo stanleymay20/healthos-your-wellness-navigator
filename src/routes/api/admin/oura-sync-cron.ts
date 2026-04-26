@@ -6,6 +6,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { runScheduledOuraSync } from "@/lib/providers/oura-sync-batch.server";
+import { logger } from "@/lib/log/logger";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -32,8 +33,19 @@ export const Route = createFileRoute("/api/admin/oura-sync-cron")({
 
         try {
           const outcome = await runScheduledOuraSync();
+          logger.info({
+            event: "oura_sync_cron.completed",
+            usersScanned: outcome.usersScanned,
+            usersSynced: outcome.usersSynced,
+            usersFailed: outcome.usersFailed,
+            runId: outcome.runId,
+          });
           return jsonResponse({ ok: true, ...outcome });
         } catch (e) {
+          logger.error({
+            event: "oura_sync_cron.failed",
+            error: (e as Error).message,
+          });
           return jsonResponse(
             { ok: false, error: (e as Error).message },
             500,

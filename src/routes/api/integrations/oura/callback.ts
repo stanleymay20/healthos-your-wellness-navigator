@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { exchangeCodeForTokens } from "@/lib/providers/oura";
+import { logger } from "@/lib/log/logger";
 
 const PROVIDER = "oura" as const;
 
@@ -29,6 +30,11 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
 
         if (oauthError) {
           // User denied or upstream rejected. Don't write a fake row.
+          logger.warn({
+            event: "oura_oauth.callback.denied",
+            provider: PROVIDER,
+            reason: oauthError,
+          });
           return redirectToDevices(`denied:${oauthError}`);
         }
         if (!state) return badRequest("missing state");
@@ -69,6 +75,12 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
         } catch (e) {
           // Surface the failure on the connection row so the user sees it,
           // and consume the state so it can't be retried with the same code.
+          logger.error({
+            event: "oura_oauth.callback.token_exchange_failed",
+            userId,
+            provider: PROVIDER,
+            error: (e as Error).message,
+          });
           await admin.from("oauth_state").delete().eq("state", state);
           await admin.from("device_connections").upsert(
             {
