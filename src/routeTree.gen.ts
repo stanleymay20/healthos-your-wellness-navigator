@@ -26,6 +26,7 @@ import { Route as AppLogsRouteImport } from './routes/_app/logs'
 import { Route as AppInsightsRouteImport } from './routes/_app/insights'
 import { Route as AppDevicesRouteImport } from './routes/_app/devices'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as ApiMeExportRouteImport } from './routes/api/me/export'
 import { Route as ApiAdminScoreParityRouteImport } from './routes/api/admin/score-parity'
 import { Route as ApiAdminOuraSyncCronRouteImport } from './routes/api/admin/oura-sync-cron'
 import { Route as ApiAdminBackfillScoresRouteImport } from './routes/api/admin/backfill-scores'
@@ -117,6 +118,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiMeExportRoute = ApiMeExportRouteImport.update({
+  id: '/api/me/export',
+  path: '/api/me/export',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminScoreParityRoute = ApiAdminScoreParityRouteImport.update({
   id: '/api/admin/score-parity',
   path: '/api/admin/score-parity',
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/me/export': typeof ApiMeExportRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/me/export': typeof ApiMeExportRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
@@ -220,6 +228,7 @@ export interface FileRoutesById {
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/me/export': typeof ApiMeExportRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
@@ -246,6 +255,7 @@ export interface FileRouteTypes {
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
     | '/api/admin/score-parity'
+    | '/api/me/export'
     | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
     | '/api/admin/score-parity'
+    | '/api/me/export'
     | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
     | '/api/admin/score-parity'
+    | '/api/me/export'
     | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
@@ -313,6 +325,7 @@ export interface RootRouteChildren {
   ApiAdminBackfillScoresRoute: typeof ApiAdminBackfillScoresRoute
   ApiAdminOuraSyncCronRoute: typeof ApiAdminOuraSyncCronRoute
   ApiAdminScoreParityRoute: typeof ApiAdminScoreParityRoute
+  ApiMeExportRoute: typeof ApiMeExportRoute
   ApiIntegrationsOuraAuthorizeRoute: typeof ApiIntegrationsOuraAuthorizeRoute
   ApiIntegrationsOuraCallbackRoute: typeof ApiIntegrationsOuraCallbackRoute
   ApiIntegrationsOuraSyncRoute: typeof ApiIntegrationsOuraSyncRoute
@@ -439,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/me/export': {
+      id: '/api/me/export'
+      path: '/api/me/export'
+      fullPath: '/api/me/export'
+      preLoaderRoute: typeof ApiMeExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/score-parity': {
       id: '/api/admin/score-parity'
       path: '/api/admin/score-parity'
@@ -521,6 +541,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminBackfillScoresRoute: ApiAdminBackfillScoresRoute,
   ApiAdminOuraSyncCronRoute: ApiAdminOuraSyncCronRoute,
   ApiAdminScoreParityRoute: ApiAdminScoreParityRoute,
+  ApiMeExportRoute: ApiMeExportRoute,
   ApiIntegrationsOuraAuthorizeRoute: ApiIntegrationsOuraAuthorizeRoute,
   ApiIntegrationsOuraCallbackRoute: ApiIntegrationsOuraCallbackRoute,
   ApiIntegrationsOuraSyncRoute: ApiIntegrationsOuraSyncRoute,

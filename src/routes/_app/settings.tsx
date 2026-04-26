@@ -56,12 +56,57 @@ function Section({ title, desc, children }: { title: string; desc: string; child
 }
 
 function Settings() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [healthGoal, setHealthGoal] = useState<string>("");
   const [unitSystem, setUnitSystem] = useState<UnitSystem>("metric");
   const [notifs, setNotifs] = useState<NotificationPrefs>(DEFAULT_NOTIFS);
+
+  async function exportMyData() {
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      toast.error("Not signed in.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const res = await fetch("/api/me/export", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) {
+        let msg = `Export failed (${res.status})`;
+        try {
+          const body = await res.json();
+          if (body?.error) msg = body.error as string;
+        } catch {
+          /* swallow — keep generic message */
+        }
+        toast.error(msg);
+        return;
+      }
+      // Browser download. Filename comes from the server's
+      // Content-Disposition; fall back to a date-stamped default.
+      const blob = await res.blob();
+      const dispo = res.headers.get("Content-Disposition") ?? "";
+      const match = dispo.match(/filename="?([^"]+)"?/i);
+      const filename = match?.[1] ?? `healthos-export-${new Date().toISOString().slice(0, 10)}.json`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Export downloaded.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -181,7 +226,14 @@ function Settings() {
           <Switch />
         </div>
         <div className="flex flex-wrap gap-2 pt-2">
-          <Button variant="outline" className="rounded-full">Export my data</Button>
+          <Button
+            variant="outline"
+            className="rounded-full"
+            onClick={exportMyData}
+            disabled={exporting || !session?.access_token}
+          >
+            {exporting ? "Preparing…" : "Export my data"}
+          </Button>
           <Button variant="outline" className="rounded-full text-destructive border-destructive/30">Delete account</Button>
         </div>
       </Section>
