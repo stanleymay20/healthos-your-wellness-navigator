@@ -7,18 +7,29 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runScheduledOuraSync } from "@/lib/providers/oura-sync-batch.server";
 import { logger } from "@/lib/log/logger";
+import { getClientIp, secureJsonResponse } from "@/lib/api/response";
+import { enforceRateLimit } from "@/lib/rate-limit/limiter";
+
+const RATE_LIMIT = 60;
+const RATE_WINDOW_SEC = 3600;
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+  return secureJsonResponse(body, status);
 }
 
 export const Route = createFileRoute("/api/admin/oura-sync-cron")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const limit = enforceRateLimit(`cron:${getClientIp(request)}`, RATE_LIMIT, RATE_WINDOW_SEC);
+        if (!limit.allowed) {
+          return secureJsonResponse(
+            { error: "Too many requests" },
+            429,
+            { "Retry-After": String(limit.retryAfter) },
+          );
+        }
+
         const cronSecret = process.env.SYNC_CRON_SECRET;
         if (!cronSecret) {
           return jsonResponse(

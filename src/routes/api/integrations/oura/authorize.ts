@@ -7,15 +7,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { buildAuthUrl, getOuraEnv } from "@/lib/providers/oura";
+import { getClientIp, secureJsonResponse } from "@/lib/api/response";
+import { enforceRateLimit } from "@/lib/rate-limit/limiter";
 
 const PROVIDER = "oura" as const;
 const HANDSHAKE_TTL_MS = 10 * 60 * 1000;
+const RATE_LIMIT = 5;
+const RATE_WINDOW_SEC = 60;
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+  return secureJsonResponse(body, status);
 }
 
 // base64url without padding — RFC 7636.
@@ -41,6 +42,15 @@ export const Route = createFileRoute("/api/integrations/oura/authorize")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const limit = enforceRateLimit(`authorize:${getClientIp(request)}`, RATE_LIMIT, RATE_WINDOW_SEC);
+        if (!limit.allowed) {
+          return secureJsonResponse(
+            { error: "Too many requests" },
+            429,
+            { "Retry-After": String(limit.retryAfter) },
+          );
+        }
+
         // 1. Auth — same pattern as /sync.
         const authHeader = request.headers.get("authorization") ?? "";
         if (!authHeader.startsWith("Bearer ")) {

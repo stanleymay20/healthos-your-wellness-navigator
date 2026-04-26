@@ -3,24 +3,13 @@
 // cheap enough to hammer from uptime monitors.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { secureJsonResponse } from "@/lib/api/response";
 
 export const Route = createFileRoute("/api/health")({
   server: {
     handlers: {
       GET: async () => {
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            ts: new Date().toISOString(),
-          }),
-          {
-            status: 200,
-            headers: {
-              "Content-Type": "application/json",
-              "Cache-Control": "no-store",
-            },
-          },
-        );
+        return secureJsonResponse({ ok: true, ts: new Date().toISOString() });
       },
     },
   },

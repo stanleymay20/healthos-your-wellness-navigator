@@ -2,27 +2,39 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { exchangeCodeForTokens } from "@/lib/providers/oura";
 import { logger } from "@/lib/log/logger";
+import {
+  getClientIp,
+  secureJsonResponse,
+  secureRedirect,
+  secureTextResponse,
+} from "@/lib/api/response";
+import { enforceRateLimit } from "@/lib/rate-limit/limiter";
 
 const PROVIDER = "oura" as const;
+const RATE_LIMIT = 30;
+const RATE_WINDOW_SEC = 60;
 
 function redirectToDevices(reason: string): Response {
-  return new Response(null, {
-    status: 302,
-    headers: { Location: `/devices?oauth=${encodeURIComponent(reason)}` },
-  });
+  return secureRedirect(`/devices?oauth=${encodeURIComponent(reason)}`);
 }
 
 function badRequest(reason: string): Response {
-  return new Response(`OAuth callback error: ${reason}`, {
-    status: 400,
-    headers: { "Content-Type": "text/plain" },
-  });
+  return secureTextResponse(`OAuth callback error: ${reason}`, 400);
 }
 
 export const Route = createFileRoute("/api/integrations/oura/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        const limit = enforceRateLimit(`oauth_cb:${getClientIp(request)}`, RATE_LIMIT, RATE_WINDOW_SEC);
+        if (!limit.allowed) {
+          return secureJsonResponse(
+            { error: "Too many requests" },
+            429,
+            { "Retry-After": String(limit.retryAfter) },
+          );
+        }
+
         const url = new URL(request.url);
         const code = url.searchParams.get("code");
         const state = url.searchParams.get("state");
@@ -54,7 +66,7 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
           .maybeSingle();
 
         if (stateErr) {
-          return new Response(`oauth_state lookup failed: ${stateErr.message}`, { status: 500 });
+          return secureTextResponse(`oauth_state lookup failed: ${stateErr.message}`, 500);
         }
         if (!stateRow) return badRequest("state not found");
         if (stateRow.provider !== PROVIDER) return badRequest("state provider mismatch");
@@ -107,7 +119,7 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
           { onConflict: "user_id,provider" },
         );
         if (tokenErr) {
-          return new Response(`token persist failed: ${tokenErr.message}`, { status: 500 });
+          return secureTextResponse(`token persist failed: ${tokenErr.message}`, 500);
         }
 
         // 4. Mark the connection live. last_synced_at stays null until a real
@@ -123,7 +135,7 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
           { onConflict: "user_id,provider" },
         );
         if (connErr) {
-          return new Response(`connection update failed: ${connErr.message}`, { status: 500 });
+          return secureTextResponse(`connection update failed: ${connErr.message}`, 500);
         }
 
         // 5. Burn the handshake row so the same state can't be reused.

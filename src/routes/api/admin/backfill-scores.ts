@@ -8,15 +8,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { backfillScoresFromSnapshots } from "@/lib/scoring/persist.server";
+import { getClientIp, secureJsonResponse } from "@/lib/api/response";
+import { enforceRateLimit } from "@/lib/rate-limit/limiter";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_WINDOW_DAYS = 180;
+const RATE_LIMIT = 10;
+const RATE_WINDOW_SEC = 3600;
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+  return secureJsonResponse(body, status);
 }
 
 function daysBetween(start: string, end: string): number {
@@ -29,6 +30,15 @@ export const Route = createFileRoute("/api/admin/backfill-scores")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const limit = enforceRateLimit(`backfill:${getClientIp(request)}`, RATE_LIMIT, RATE_WINDOW_SEC);
+        if (!limit.allowed) {
+          return secureJsonResponse(
+            { error: "Too many requests" },
+            429,
+            { "Retry-After": String(limit.retryAfter) },
+          );
+        }
+
         const adminSecret = process.env.BACKFILL_ADMIN_SECRET;
         if (!adminSecret) {
           return jsonResponse(
