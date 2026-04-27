@@ -14,6 +14,13 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  ACTIVE_VERSIONS,
+  CONSENT_DOCS,
+  DOC_LABELS,
+  DOC_URLS,
+  type ConsentDoc,
+} from "@/lib/consent/versions";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — HealthOS" }] }),
@@ -65,6 +72,57 @@ function Settings() {
   const [notifs, setNotifs] = useState<NotificationPrefs>(DEFAULT_NOTIFS);
   const [pendingDeleteAt, setPendingDeleteAt] = useState<string | null>(null);
   const [deletionBusy, setDeletionBusy] = useState(false);
+  // Consent state: latest accepted version per document, or null if never.
+  const [consentByDoc, setConsentByDoc] = useState<Record<ConsentDoc, { version: string; accepted_at: string } | null>>({
+    tos: null,
+    privacy: null,
+  });
+  const [consentBusy, setConsentBusy] = useState<ConsentDoc | null>(null);
+
+  async function refreshConsent(userId: string) {
+    const client = supabase as unknown as { from: (t: string) => any };
+    const { data } = await client
+      .from("consent_acceptances")
+      .select("document, version, accepted_at")
+      .eq("user_id", userId)
+      .order("accepted_at", { ascending: false });
+    const rows = (data ?? []) as Array<{
+      document: ConsentDoc;
+      version: string;
+      accepted_at: string;
+    }>;
+    const next: Record<ConsentDoc, { version: string; accepted_at: string } | null> = {
+      tos: null,
+      privacy: null,
+    };
+    for (const row of rows) {
+      // First row per document wins because we ordered DESC by accepted_at.
+      if (next[row.document] === null) {
+        next[row.document] = { version: row.version, accepted_at: row.accepted_at };
+      }
+    }
+    setConsentByDoc(next);
+  }
+
+  async function acceptDoc(doc: ConsentDoc) {
+    if (!user) return;
+    setConsentBusy(doc);
+    try {
+      const client = supabase as unknown as { from: (t: string) => any };
+      const { error } = await client.from("consent_acceptances").upsert(
+        { user_id: user.id, document: doc, version: ACTIVE_VERSIONS[doc] },
+        { onConflict: "user_id,document,version", ignoreDuplicates: true },
+      );
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      await refreshConsent(user.id);
+      toast.success(`Accepted ${DOC_LABELS[doc]} v${ACTIVE_VERSIONS[doc]}.`);
+    } finally {
+      setConsentBusy(null);
+    }
+  }
 
   async function refreshDeletionState(userId: string) {
     // account_deletions isn't in the generated Supabase types yet;
@@ -209,6 +267,7 @@ function Settings() {
       }
       // Best-effort: surface a pending deletion if one exists.
       try { await refreshDeletionState(user.id); } catch { /* ignore */ }
+      try { await refreshConsent(user.id); } catch { /* ignore */ }
       setLoading(false);
     })();
     return () => {
@@ -302,6 +361,59 @@ function Settings() {
             />
           </div>
         ))}
+      </Section>
+
+      <Section title="Legal" desc="Your acceptance history.">
+        <ul className="space-y-3">
+          {CONSENT_DOCS.map((doc) => {
+            const accepted = consentByDoc[doc];
+            const stale = accepted !== null && accepted.version !== ACTIVE_VERSIONS[doc];
+            return (
+              <li key={doc} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">
+                    <a
+                      href={DOC_URLS[doc]}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:underline"
+                    >
+                      {DOC_LABELS[doc]}
+                    </a>
+                  </p>
+                  {accepted ? (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Accepted v{accepted.version} on{" "}
+                      {new Date(accepted.accepted_at).toLocaleDateString(undefined, {
+                        dateStyle: "long",
+                      })}
+                      {stale && (
+                        <span className="ml-2 text-warning font-semibold">
+                          (current version is v{ACTIVE_VERSIONS[doc]})
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Not yet accepted. Current version v{ACTIVE_VERSIONS[doc]}.
+                    </p>
+                  )}
+                </div>
+                {(!accepted || stale) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full shrink-0"
+                    onClick={() => acceptDoc(doc)}
+                    disabled={consentBusy === doc}
+                  >
+                    {consentBusy === doc ? "Accepting…" : "Accept now"}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </Section>
 
       <Section title="Privacy" desc="Your data is yours. Always.">

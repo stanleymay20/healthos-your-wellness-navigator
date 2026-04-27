@@ -9,6 +9,12 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { getOnboardingStatus } from "@/lib/onboarding";
+import {
+  ACTIVE_VERSIONS,
+  CONSENT_DOCS,
+  DOC_LABELS,
+  DOC_URLS,
+} from "@/lib/consent/versions";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({ meta: [{ title: "Welcome — HealthOS" }] }),
@@ -36,6 +42,8 @@ function Onboarding() {
   const [goal, setGoal] = useState("");
   const [hydrating, setHydrating] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [acceptedTos, setAcceptedTos] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -73,16 +81,34 @@ function Onboarding() {
       toast.error("Please enter your name and pick a goal.");
       return;
     }
+    if (!acceptedTos || !acceptedPrivacy) {
+      toast.error("Please accept the Terms and Privacy Policy to continue.");
+      return;
+    }
     setSaving(true);
-    const [{ error: profileErr }, { error: prefsErr }] = await Promise.all([
-      supabase.from("profiles").upsert({ id: user.id, full_name: name }, { onConflict: "id" }),
-      supabase
-        .from("user_preferences")
-        .upsert({ user_id: user.id, health_goal: goal }, { onConflict: "user_id" }),
-    ]);
+    // consent_acceptances isn't in the generated Supabase types yet —
+    // boundary cast on this client. Idempotent: ignoreDuplicates so a
+    // re-submit with the same versions doesn't 409.
+    const consentClient = supabase as unknown as { from: (t: string) => any };
+    const consentRows = CONSENT_DOCS.map((doc) => ({
+      user_id: user.id,
+      document: doc,
+      version: ACTIVE_VERSIONS[doc],
+    }));
+    const [{ error: profileErr }, { error: prefsErr }, { error: consentErr }] =
+      await Promise.all([
+        supabase.from("profiles").upsert({ id: user.id, full_name: name }, { onConflict: "id" }),
+        supabase
+          .from("user_preferences")
+          .upsert({ user_id: user.id, health_goal: goal }, { onConflict: "user_id" }),
+        consentClient.from("consent_acceptances").upsert(consentRows, {
+          onConflict: "user_id,document,version",
+          ignoreDuplicates: true,
+        }),
+      ]);
     setSaving(false);
-    if (profileErr || prefsErr) {
-      toast.error((profileErr ?? prefsErr)!.message);
+    if (profileErr || prefsErr || consentErr) {
+      toast.error((profileErr ?? prefsErr ?? consentErr)!.message);
       return;
     }
     toast.success("You're all set!");
@@ -141,7 +167,43 @@ function Onboarding() {
               ))}
             </div>
           </div>
-          <Button type="submit" className="w-full rounded-full" disabled={saving}>
+          <div className="space-y-2 rounded-xl border border-border p-3 text-sm">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acceptedTos}
+                onChange={(e) => setAcceptedTos(e.target.checked)}
+                className="mt-1 accent-primary"
+              />
+              <span>
+                I agree to the{" "}
+                <a href={DOC_URLS.tos} target="_blank" rel="noreferrer" className="text-primary underline">
+                  {DOC_LABELS.tos}
+                </a>{" "}
+                <span className="text-muted-foreground">(v{ACTIVE_VERSIONS.tos})</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acceptedPrivacy}
+                onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                className="mt-1 accent-primary"
+              />
+              <span>
+                I agree to the{" "}
+                <a href={DOC_URLS.privacy} target="_blank" rel="noreferrer" className="text-primary underline">
+                  {DOC_LABELS.privacy}
+                </a>{" "}
+                <span className="text-muted-foreground">(v{ACTIVE_VERSIONS.privacy})</span>
+              </span>
+            </label>
+          </div>
+          <Button
+            type="submit"
+            className="w-full rounded-full"
+            disabled={saving || !acceptedTos || !acceptedPrivacy}
+          >
             {saving ? "Saving..." : "Continue to dashboard"}
           </Button>
         </form>
