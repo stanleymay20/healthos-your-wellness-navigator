@@ -1,0 +1,31 @@
+// Sidecar Worker config: runs the scheduled-sync trigger on a cron and
+// POSTs the main app's /api/admin/oura-sync-cron endpoint. Deployed
+// independently from the main app so the framework's owned worker entry
+// is not perturbed.
+//
+// Usage:
+//   wrangler deploy --config wrangler-scheduled.jsonc
+//
+// Required secrets (set via `wrangler secret put --config wrangler-scheduled.jsonc`):
+//   SYNC_CRON_SECRET      same value the main app reads from process.env
+//
+// Required vars (in this file's "vars" block, NOT secrets):
+//   SYNC_CRON_TARGET_URL  e.g. "https://app.example.com/api/admin/oura-sync-cron"
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "healthos-cron-sidecar",
+  "compatibility_date": "2025-09-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/worker-scheduled.ts",
+  "vars": {
+    // Override per environment via `wrangler deploy --var SYNC_CRON_TARGET_URL=...`
+    // or set in a wrangler env block. Left blank here so a copy-paste deploy
+    // fails clearly with the helpful "not configured" message.
+    "SYNC_CRON_TARGET_URL": ""
+  },
+  "triggers": {
+    // Every 30 minutes. Tune to taste; respects Oura rate limits at any
+    // sane frequency.
+    "crons": ["*/30 * * * *"]
+  }
+}
