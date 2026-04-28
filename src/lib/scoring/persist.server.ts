@@ -27,6 +27,7 @@ export async function persistDerivedScores(
     sleep_score: d.sleep_score,
     recovery_score: d.recovery_score,
     activity_score: d.activity_score,
+    stress_score: d.stress_score,
   }));
 
   const { error } = await admin

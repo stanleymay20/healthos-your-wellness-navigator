@@ -14,6 +14,7 @@ type SnapshotRow = {
   record_date: string;
   record_type: string;
   score: number | null;
+  payload: Record<string, unknown> | null;
 };
 
 function isKnownRecordType(t: string): t is SnapshotInput["record_type"] {
@@ -31,7 +32,7 @@ export async function deriveScoresFromSnapshotsForUser(args: {
 
   const { data, error } = await admin
     .from("wearable_daily_snapshots")
-    .select("record_date, record_type, score")
+    .select("record_date, record_type, score, payload")
     .eq("user_id", args.userId)
     .eq("provider", provider)
     .gte("record_date", args.startDate)
@@ -45,6 +46,7 @@ export async function deriveScoresFromSnapshotsForUser(args: {
       record_date: r.record_date,
       record_type: r.record_type as SnapshotInput["record_type"],
       score: r.score,
+      payload: r.payload,
     }));
 
   return deriveDailyScores(inputs);

@@ -340,6 +340,7 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       record_date: r.record_date as string,
       record_type: r.record_type as SnapshotInput["record_type"],
       score: (r.score as number | null) ?? null,
+      payload: (r.payload as Record<string, unknown> | null) ?? null,
     }));
     const derived = deriveDailyScores(derivationInputs);
     const { daysWritten } = await persistDerivedScores(userId, derived);

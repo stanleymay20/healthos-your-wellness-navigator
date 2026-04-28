@@ -17,7 +17,7 @@ export async function compareScoreParityForUser(args: {
 
   const { data, error } = await admin
     .from("health_scores")
-    .select("score_date, overall_score, sleep_score, recovery_score, activity_score")
+    .select("score_date, overall_score, sleep_score, recovery_score, activity_score, stress_score")
     .eq("user_id", args.userId)
     .gte("score_date", args.startDate)
     .lte("score_date", args.endDate);
@@ -38,6 +38,7 @@ export async function compareScoreParityForUser(args: {
     sleep_score: d.sleep_score,
     recovery_score: d.recovery_score,
     activity_score: d.activity_score,
+    stress_score: d.stress_score,
   }));
 
   return compareScores(live, derived, args.sampleLimit ?? 20);

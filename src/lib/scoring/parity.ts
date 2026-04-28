@@ -9,6 +9,7 @@ export type ScoreRow = {
   sleep_score: number | null;
   recovery_score: number | null;
   activity_score: number | null;
+  stress_score: number | null;
 };
 
 export type MismatchKind = "field_diff" | "live_only" | "derived_only";
@@ -31,7 +32,13 @@ export type ParityReport = {
   mismatches: Mismatch[];
 };
 
-const FIELDS = ["overall_score", "sleep_score", "recovery_score", "activity_score"] as const;
+const FIELDS = [
+  "overall_score",
+  "sleep_score",
+  "recovery_score",
+  "activity_score",
+  "stress_score",
+] as const;
 
 function diffFields(live: ScoreRow, derived: ScoreRow): Mismatch["fields"] {
   const out: NonNullable<Mismatch["fields"]> = [];

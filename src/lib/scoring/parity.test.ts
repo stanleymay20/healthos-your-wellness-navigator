@@ -7,12 +7,14 @@ const row = (
   sleep: number | null = overall,
   recovery: number | null = overall,
   activity: number | null = overall,
+  stress: number | null = overall,
 ): ScoreRow => ({
   score_date: date,
   overall_score: overall,
   sleep_score: sleep,
   recovery_score: recovery,
   activity_score: activity,
+  stress_score: stress,
 });
 
 describe("compareScores", () => {
