@@ -58,6 +58,7 @@ export const Route = createFileRoute("/api/admin/oura-sync-cron")({
             event: "oura_sync_cron.completed",
             usersScanned: outcome.usersScanned,
             usersSynced: outcome.usersSynced,
+            usersSkipped: outcome.usersSkipped,
             usersFailed: outcome.usersFailed,
             runId: outcome.runId,
           });
@@ -69,6 +70,7 @@ export const Route = createFileRoute("/api/admin/oura-sync-cron")({
             details: {
               usersScanned: outcome.usersScanned,
               usersSynced: outcome.usersSynced,
+              usersSkipped: outcome.usersSkipped,
               usersFailed: outcome.usersFailed,
               runId: outcome.runId,
             },

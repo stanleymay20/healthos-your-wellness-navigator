@@ -4,7 +4,7 @@
 // /api/admin/oura-sync-cron; not user-facing.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { syncOuraForUser } from "./oura-sync.server";
+import { syncOuraForUser, SyncLockHeldError } from "./oura-sync.server";
 
 const PROVIDER = "oura" as const;
 const MAX_FIRST_ERROR_LEN = 500;
@@ -15,6 +15,7 @@ export type BatchFailure = { userId: string; error: string };
 export type BatchOutcome = {
   usersScanned: number;
   usersSynced: number;
+  usersSkipped: number;
   usersFailed: number;
   failures: BatchFailure[];
   runId: string | null;
@@ -43,6 +44,7 @@ export async function runScheduledOuraSync(): Promise<BatchOutcome> {
         provider: PROVIDER,
         users_scanned: 0,
         users_synced: 0,
+        users_skipped: 0,
         users_failed: 0,
         first_error: `candidate lookup failed: ${connErr.message}`.slice(0, MAX_FIRST_ERROR_LEN),
         started_at: startedAt,
@@ -56,6 +58,7 @@ export async function runScheduledOuraSync(): Promise<BatchOutcome> {
   const candidates = (connections ?? []) as Array<{ user_id: string }>;
   const usersScanned = candidates.length;
   let usersSynced = 0;
+  let usersSkipped = 0;
   let usersFailed = 0;
   const failures: BatchFailure[] = [];
   let firstError: string | null = null;
@@ -65,6 +68,13 @@ export async function runScheduledOuraSync(): Promise<BatchOutcome> {
       await syncOuraForUser(row.user_id);
       usersSynced++;
     } catch (err) {
+      // Lock-held is a benign outcome: another sync is already in flight
+      // for this user. Count it separately and don't pollute the failure
+      // list — the next batch tick (or the in-flight sync) will catch up.
+      if (err instanceof SyncLockHeldError) {
+        usersSkipped++;
+        continue;
+      }
       usersFailed++;
       const message = (err as Error).message.slice(0, MAX_FIRST_ERROR_LEN);
       if (!firstError) firstError = message;
@@ -82,6 +92,7 @@ export async function runScheduledOuraSync(): Promise<BatchOutcome> {
       provider: PROVIDER,
       users_scanned: usersScanned,
       users_synced: usersSynced,
+      users_skipped: usersSkipped,
       users_failed: usersFailed,
       first_error: firstError,
       started_at: startedAt,
@@ -91,5 +102,5 @@ export async function runScheduledOuraSync(): Promise<BatchOutcome> {
     .maybeSingle();
   if (!runErr && runRow?.id) runId = runRow.id as string;
 
-  return { usersScanned, usersSynced, usersFailed, failures, runId };
+  return { usersScanned, usersSynced, usersSkipped, usersFailed, failures, runId };
 }

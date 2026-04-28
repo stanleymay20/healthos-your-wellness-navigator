@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { syncOuraForUser } from "@/lib/providers/oura-sync.server";
+import { syncOuraForUser, SyncLockHeldError } from "@/lib/providers/oura-sync.server";
 import { getClientIp, secureJsonResponse } from "@/lib/api/response";
 import { enforceRateLimit } from "@/lib/rate-limit/limiter";
 
@@ -37,6 +37,15 @@ export const Route = createFileRoute("/api/integrations/oura/sync")({
           const outcome = await syncOuraForUser(userData.user.id);
           return secureJsonResponse({ ok: true, ...outcome });
         } catch (e) {
+          // Another sync (cron or a previous click) is already in flight
+          // for this user. 409 Conflict is the right semantics — the
+          // request was well-formed but conflicts with current state.
+          if (e instanceof SyncLockHeldError) {
+            return secureJsonResponse(
+              { ok: false, error: "Sync already in progress for this account." },
+              409,
+            );
+          }
           return secureJsonResponse({ ok: false, error: (e as Error).message }, 502);
         }
       },

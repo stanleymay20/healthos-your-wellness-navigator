@@ -124,6 +124,23 @@ class TokenRevokedError extends Error {
   }
 }
 
+// Thrown when a per-user sync is already in flight (lock held by another
+// caller). Distinct from a token problem — the caller should treat it as
+// "skipped, try again later," not as a failure.
+export class SyncLockHeldError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SyncLockHeldError";
+  }
+}
+
+// How long we hold the lock before another caller is allowed to reclaim
+// it. Real syncs complete in seconds (3 API calls + DB writes). Ten
+// minutes is generous enough that a slow run won't get reclaimed mid-
+// flight, but short enough that a crashed sync doesn't keep the user
+// locked out for long.
+const SYNC_LOCK_TTL_MS = 10 * 60 * 1000;
+
 type OuraDailyRecord = Record<string, unknown> & {
   day?: unknown;
   score?: unknown;
@@ -232,9 +249,98 @@ async function refreshAndPersist(
   };
 }
 
+// Atomic per-(user, provider) lock acquire. Single conditional UPDATE: if
+// the existing locked_until is NULL or already in the past, claim it; if
+// another caller holds an unexpired lock, the WHERE matches no rows and
+// the RETURNING is empty. Returns:
+//   "acquired" — we now hold the lock; caller must release in a finally
+//   "held"     — another sync is in flight; caller should bail
+//   "no_row"   — no device_connections row exists for this user/provider;
+//                fall through (the existing token check will surface the
+//                "no connection" condition with the right error)
+async function tryAcquireSyncLock(
+  admin: { from: (t: string) => any },
+  userId: string,
+): Promise<"acquired" | "held" | "no_row"> {
+  const nowIso = new Date().toISOString();
+  const lockUntilIso = new Date(Date.now() + SYNC_LOCK_TTL_MS).toISOString();
+
+  const { data: updated, error: updErr } = await admin
+    .from("device_connections")
+    .update({ locked_until: lockUntilIso })
+    .eq("user_id", userId)
+    .eq("provider", PROVIDER)
+    .or(`locked_until.is.null,locked_until.lt.${nowIso}`)
+    .select("id")
+    .maybeSingle();
+  if (updErr) throw new Error(`sync lock acquire failed: ${updErr.message}`);
+  if (updated) return "acquired";
+
+  // Zero rows updated. Disambiguate "locked" from "no row" with a SELECT
+  // — the difference matters because the existing flow handles "no row"
+  // with TokenRevokedError, but "held" should bail as a skip.
+  const { data: existing } = await admin
+    .from("device_connections")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("provider", PROVIDER)
+    .maybeSingle();
+  return existing ? "held" : "no_row";
+}
+
+async function releaseSyncLock(
+  admin: { from: (t: string) => any },
+  userId: string,
+): Promise<void> {
+  const { error } = await admin
+    .from("device_connections")
+    .update({ locked_until: null })
+    .eq("user_id", userId)
+    .eq("provider", PROVIDER);
+  if (error) {
+    // Non-fatal: the TTL will reclaim the lock eventually. Just log so we
+    // can spot persistent release failures in operations.
+    logger.warn({
+      event: "oura_sync.lock_release_failed",
+      userId,
+      provider: PROVIDER,
+      error: error.message,
+    });
+  }
+}
+
 export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
   const admin = supabaseAdmin as unknown as { from: (t: string) => any };
 
+  // 0. Acquire the per-user sync lock. If another caller already holds it,
+  //    bail with SyncLockHeldError so the batch can count this as a skip
+  //    (not a failure) and move on.
+  const lockState = await tryAcquireSyncLock(admin, userId);
+  if (lockState === "held") {
+    logger.info({
+      event: "oura_sync.lock_held_skipping",
+      userId,
+      provider: PROVIDER,
+    });
+    throw new SyncLockHeldError(
+      "Another sync is already in flight for this user.",
+    );
+  }
+
+  try {
+    return await runSyncOuraForUser(userId, admin);
+  } finally {
+    await releaseSyncLock(admin, userId);
+  }
+}
+
+// The actual sync body, run only after the per-user lock has been acquired.
+// Split out from syncOuraForUser purely so the lock acquire/release can wrap
+// it without re-indenting every line.
+async function runSyncOuraForUser(
+  userId: string,
+  admin: { from: (t: string) => any },
+): Promise<SyncOutcome> {
   // 1. Mark the connection as syncing so the UI can reflect it. Errors here
   //    are non-fatal (the row may not exist if state is mid-rebuild).
   await admin
