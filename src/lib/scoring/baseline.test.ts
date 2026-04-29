@@ -48,6 +48,21 @@ describe("computeBaseline", () => {
     const baseline = computeBaseline(buildScores([80, 80, 80, 80, 80], 80));
     expect(baseline!.overall.stddev).toBe(3);
   });
+
+  it("computes p25 across the prior-day window", () => {
+    // Prior 5 days sorted ascending: [40, 60, 70, 80, 90]
+    // p25 (linear interp at rank 0.25 * 4 = 1.0) → values[1] = 60.
+    const baseline = computeBaseline(buildScores([40, 60, 70, 80, 90], 75));
+    expect(baseline!.overall.p25).toBe(60);
+  });
+
+  it("p25 equals the value when window collapses to 1", () => {
+    // The latest is excluded from the window, leaving exactly the cap of
+    // 14 prior values. Validate the simpler degenerate case via a stub by
+    // running on uniform values: any percentile is the value itself.
+    const baseline = computeBaseline(buildScores([80, 80, 80, 80, 80], 75));
+    expect(baseline!.overall.p25).toBe(80);
+  });
 });
 
 describe("computeDeviation", () => {

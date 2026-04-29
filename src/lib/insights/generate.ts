@@ -62,21 +62,30 @@ export function generateInsights(
     }
   }
 
-  // Fixed-threshold fallbacks. Skipped when a baseline-aware insight for
-  // the same dimension already fired (deviation present + below threshold).
+  // Soft-threshold fallbacks. When the user has enough history for a
+  // baseline, the cuts come from their own bottom-quartile (`p25`) so a
+  // "low day" is judged relative to the user's own recent days. When
+  // there's no baseline yet (cold start), we fall back to the legacy
+  // fixed cuts (50/60/50). Each fallback is suppressed if the baseline-
+  // aware branch already fired on the same dimension.
+  const baseline = context?.baseline ?? null;
+  const overallCut = baseline?.overall.p25 ?? 50;
+  const sleepCut = baseline?.sleep?.p25 ?? 60;
+  const activityCut = baseline?.activity?.p25 ?? 50;
+
   const baselineSleepFired =
     deviation?.sleep != null && deviation.sleep <= SIGNIFICANT_BELOW_Z;
   const baselineActivityFired =
     deviation?.activity != null && deviation.activity <= SIGNIFICANT_BELOW_Z;
 
-  if (out.length < MAX_INSIGHTS && latest.overall_score < 50) {
+  if (out.length < MAX_INSIGHTS && latest.overall_score < overallCut) {
     out.push("Your recovery is low. Prioritize rest today.");
   }
   if (
     out.length < MAX_INSIGHTS &&
     !baselineSleepFired &&
     latest.sleep_score != null &&
-    latest.sleep_score < 60
+    latest.sleep_score < sleepCut
   ) {
     out.push("Your sleep quality dropped. Consider earlier sleep.");
   }
@@ -84,7 +93,7 @@ export function generateInsights(
     out.length < MAX_INSIGHTS &&
     !baselineActivityFired &&
     latest.activity_score != null &&
-    latest.activity_score < 50
+    latest.activity_score < activityCut
   ) {
     out.push("Low activity detected. Try light movement today.");
   }

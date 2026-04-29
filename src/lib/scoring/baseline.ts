@@ -11,7 +11,17 @@ export type BaselineScoreInput = {
   activity_score: number | null;
 };
 
-export type DimensionStats = { mean: number; stddev: number; n: number };
+export type DimensionStats = {
+  mean: number;
+  stddev: number;
+  n: number;
+  // 25th percentile of the baseline-window values for this dimension.
+  // Used by the insight generator's fallback ladder so "below your usual"
+  // is keyed to the user's own history once they have one, replacing the
+  // legacy fixed-50/60 cuts. Linearly interpolated; same value as `mean`
+  // when n=1 or all values are identical.
+  p25: number;
+};
 
 export type Baseline = {
   windowDays: number; // number of prior days that contributed to overall
@@ -52,7 +62,24 @@ function statsOf(values: number[]): DimensionStats | null {
   const mean = values.reduce((a, b) => a + b, 0) / n;
   const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
   const stddev = Math.max(Math.sqrt(variance), STDDEV_FLOOR);
-  return { mean, stddev, n };
+  return { mean, stddev, n, p25: percentile(values, 0.25) };
+}
+
+// Linear-interpolation percentile. Pure; no I/O. `pct` is in [0, 1].
+// For n=1 returns the single value; for n>=2 sorts a copy and interpolates
+// between the two surrounding ranks. We don't need a fancier estimator —
+// the goal is just "where does a recent day sit relative to the user's
+// last 5–14 days" — and linear interpolation is the standard choice.
+function percentile(values: number[], pct: number): number {
+  if (values.length === 0) return 0;
+  if (values.length === 1) return values[0];
+  const sorted = [...values].sort((a, b) => a - b);
+  const rank = pct * (sorted.length - 1);
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  if (lo === hi) return sorted[lo];
+  const frac = rank - lo;
+  return sorted[lo] * (1 - frac) + sorted[hi] * frac;
 }
 
 // scores must be sorted newest-first (scores[0] = latest day).
