@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getRequestId, recordServerError } from "@/lib/logger.server";
 import { exchangeCodeForTokens } from "@/lib/providers/oura";
 
 const PROVIDER = "oura" as const;
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        const requestId = getRequestId(request);
         const url = new URL(request.url);
         const code = url.searchParams.get("code");
         const state = url.searchParams.get("state");
@@ -48,6 +50,12 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
           .maybeSingle();
 
         if (stateErr) {
+          await recordServerError({
+            requestId,
+            route: "/api/integrations/oura/callback",
+            action: "oauth_state_lookup",
+            error: stateErr,
+          });
           return new Response(`oauth_state lookup failed: ${stateErr.message}`, { status: 500 });
         }
         if (!stateRow) return badRequest("state not found");
@@ -79,6 +87,13 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
             },
             { onConflict: "user_id,provider" },
           );
+          await recordServerError({
+            requestId,
+            userId,
+            route: "/api/integrations/oura/callback",
+            action: "oura_token_exchange",
+            error: e,
+          });
           return redirectToDevices("error:token_exchange");
         }
 
@@ -95,6 +110,13 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
           { onConflict: "user_id,provider" },
         );
         if (tokenErr) {
+          await recordServerError({
+            requestId,
+            userId,
+            route: "/api/integrations/oura/callback",
+            action: "oauth_token_persist",
+            error: tokenErr,
+          });
           return new Response(`token persist failed: ${tokenErr.message}`, { status: 500 });
         }
 
@@ -111,6 +133,13 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
           { onConflict: "user_id,provider" },
         );
         if (connErr) {
+          await recordServerError({
+            requestId,
+            userId,
+            route: "/api/integrations/oura/callback",
+            action: "device_connection_update",
+            error: connErr,
+          });
           return new Response(`connection update failed: ${connErr.message}`, { status: 500 });
         }
 

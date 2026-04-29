@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_errors: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          message: string
+          metadata: Json
+          request_id: string
+          route: string | null
+          severity: string
+          stack: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json
+          request_id: string
+          route?: string | null
+          severity?: string
+          stack?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          request_id?: string
+          route?: string | null
+          severity?: string
+          stack?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       device_connections: {
         Row: {
           created_at: string
