@@ -38,11 +38,16 @@ function AuthPage() {
         toast.success("Welcome back!");
         navigate({ to: "/dashboard" });
       } else if (mode === "signup") {
-        const { error } = await signUp(email, password, fullName);
+        const { error, session } = await signUp(email, password, fullName);
         if (error) throw error;
-        toast.success("Account created. Check your email to confirm.");
-        // If email confirmation is disabled, session will exist immediately
-        navigate({ to: "/dashboard" });
+        if (session) {
+          toast.success("Account created.");
+          navigate({ to: "/dashboard" });
+        } else {
+          toast.success("Check your email to confirm your account before signing in.");
+          setMode("signin");
+          setPassword("");
+        }
       } else {
         const { error } = await resetPassword(email);
         if (error) throw error;
