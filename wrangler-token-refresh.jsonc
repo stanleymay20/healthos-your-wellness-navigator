@@ -1,0 +1,33 @@
+// Sidecar Worker config: runs the proactive Oura token-refresh trigger on
+// a cron and POSTs the main app's /api/admin/oura-token-refresh-cron
+// endpoint. Deployed independently from both the main app and the
+// sync sidecar so the three operator levers (deploy, sync cron,
+// token cron) rotate independently.
+//
+// Usage:
+//   wrangler deploy --config wrangler-token-refresh.jsonc
+//
+// Required secrets (set via `wrangler secret put --config wrangler-token-refresh.jsonc`):
+//   TOKEN_REFRESH_CRON_SECRET     same value the main app reads from process.env
+//
+// Required vars (in this file's "vars" block, NOT secrets):
+//   TOKEN_REFRESH_CRON_TARGET_URL e.g. "https://app.example.com/api/admin/oura-token-refresh-cron"
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "healthos-token-refresh-sidecar",
+  "compatibility_date": "2025-09-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/worker-token-refresh.ts",
+  "vars": {
+    // Override per environment via `wrangler deploy --var TOKEN_REFRESH_CRON_TARGET_URL=...`
+    // or set in a wrangler env block. Left blank here so a copy-paste deploy
+    // fails clearly with the helpful "not configured" message.
+    "TOKEN_REFRESH_CRON_TARGET_URL": ""
+  },
+  "triggers": {
+    // Every 4 hours. The runScheduledTokenRefresh default refresh-ahead
+    // window is 6 hours, so even if a run misses there's still a full
+    // interval of margin before any token can expire.
+    "crons": ["0 */4 * * *"]
+  }
+}

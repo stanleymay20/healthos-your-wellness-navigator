@@ -29,6 +29,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as ApiMeExportRouteImport } from './routes/api/me/export'
 import { Route as ApiMeDeleteRouteImport } from './routes/api/me/delete'
 import { Route as ApiAdminScoreParityRouteImport } from './routes/api/admin/score-parity'
+import { Route as ApiAdminOuraTokenRefreshCronRouteImport } from './routes/api/admin/oura-token-refresh-cron'
 import { Route as ApiAdminOuraSyncCronRouteImport } from './routes/api/admin/oura-sync-cron'
 import { Route as ApiAdminBackfillScoresRouteImport } from './routes/api/admin/backfill-scores'
 import { Route as ApiIntegrationsOuraSyncRouteImport } from './routes/api/integrations/oura/sync'
@@ -134,6 +135,12 @@ const ApiAdminScoreParityRoute = ApiAdminScoreParityRouteImport.update({
   path: '/api/admin/score-parity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminOuraTokenRefreshCronRoute =
+  ApiAdminOuraTokenRefreshCronRouteImport.update({
+    id: '/api/admin/oura-token-refresh-cron',
+    path: '/api/admin/oura-token-refresh-cron',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminOuraSyncCronRoute = ApiAdminOuraSyncCronRouteImport.update({
   id: '/api/admin/oura-sync-cron',
   path: '/api/admin/oura-sync-cron',
@@ -181,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
+  '/api/admin/oura-token-refresh-cron': typeof ApiAdminOuraTokenRefreshCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
   '/api/me/delete': typeof ApiMeDeleteRoute
   '/api/me/export': typeof ApiMeExportRoute
@@ -207,6 +215,7 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
+  '/api/admin/oura-token-refresh-cron': typeof ApiAdminOuraTokenRefreshCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
   '/api/me/delete': typeof ApiMeDeleteRoute
   '/api/me/export': typeof ApiMeExportRoute
@@ -235,6 +244,7 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
+  '/api/admin/oura-token-refresh-cron': typeof ApiAdminOuraTokenRefreshCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
   '/api/me/delete': typeof ApiMeDeleteRoute
   '/api/me/export': typeof ApiMeExportRoute
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
+    | '/api/admin/oura-token-refresh-cron'
     | '/api/admin/score-parity'
     | '/api/me/delete'
     | '/api/me/export'
@@ -289,6 +300,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
+    | '/api/admin/oura-token-refresh-cron'
     | '/api/admin/score-parity'
     | '/api/me/delete'
     | '/api/me/export'
@@ -316,6 +328,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/admin/backfill-scores'
     | '/api/admin/oura-sync-cron'
+    | '/api/admin/oura-token-refresh-cron'
     | '/api/admin/score-parity'
     | '/api/me/delete'
     | '/api/me/export'
@@ -336,6 +349,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiAdminBackfillScoresRoute: typeof ApiAdminBackfillScoresRoute
   ApiAdminOuraSyncCronRoute: typeof ApiAdminOuraSyncCronRoute
+  ApiAdminOuraTokenRefreshCronRoute: typeof ApiAdminOuraTokenRefreshCronRoute
   ApiAdminScoreParityRoute: typeof ApiAdminScoreParityRoute
   ApiMeDeleteRoute: typeof ApiMeDeleteRoute
   ApiMeExportRoute: typeof ApiMeExportRoute
@@ -486,6 +500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminScoreParityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/oura-token-refresh-cron': {
+      id: '/api/admin/oura-token-refresh-cron'
+      path: '/api/admin/oura-token-refresh-cron'
+      fullPath: '/api/admin/oura-token-refresh-cron'
+      preLoaderRoute: typeof ApiAdminOuraTokenRefreshCronRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/oura-sync-cron': {
       id: '/api/admin/oura-sync-cron'
       path: '/api/admin/oura-sync-cron'
@@ -560,6 +581,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiAdminBackfillScoresRoute: ApiAdminBackfillScoresRoute,
   ApiAdminOuraSyncCronRoute: ApiAdminOuraSyncCronRoute,
+  ApiAdminOuraTokenRefreshCronRoute: ApiAdminOuraTokenRefreshCronRoute,
   ApiAdminScoreParityRoute: ApiAdminScoreParityRoute,
   ApiMeDeleteRoute: ApiMeDeleteRoute,
   ApiMeExportRoute: ApiMeExportRoute,

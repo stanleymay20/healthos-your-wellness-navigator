@@ -117,7 +117,7 @@ function lookupCatalog(title: string): CatalogEntry | null {
 // is no longer usable (revoked, expired beyond refresh, scope stripped,
 // user deleted on the provider side). Any other failure is considered
 // transient and must not flip the connection to disconnected.
-class TokenRevokedError extends Error {
+export class TokenRevokedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "TokenRevokedError";
@@ -211,7 +211,10 @@ function buildSnapshotRows(
 // itself is dead, drops the stored token row and throws TokenRevokedError so
 // the outer catch marks the connection disconnected — forcing a clean
 // reconnect flow rather than looping on a bad refresh token.
-async function refreshAndPersist(
+//
+// Exported so the proactive token-refresh sidecar (Phase 35) can reuse the
+// same persistence + invalid-refresh handling without duplicating the logic.
+export async function refreshAndPersist(
   userId: string,
   refreshToken: string,
 ): Promise<{ access_token: string; refresh_token: string | null }> {
@@ -258,7 +261,7 @@ async function refreshAndPersist(
 //   "no_row"   — no device_connections row exists for this user/provider;
 //                fall through (the existing token check will surface the
 //                "no connection" condition with the right error)
-async function tryAcquireSyncLock(
+export async function tryAcquireSyncLock(
   admin: { from: (t: string) => any },
   userId: string,
 ): Promise<"acquired" | "held" | "no_row"> {
@@ -288,7 +291,7 @@ async function tryAcquireSyncLock(
   return existing ? "held" : "no_row";
 }
 
-async function releaseSyncLock(
+export async function releaseSyncLock(
   admin: { from: (t: string) => any },
   userId: string,
 ): Promise<void> {
