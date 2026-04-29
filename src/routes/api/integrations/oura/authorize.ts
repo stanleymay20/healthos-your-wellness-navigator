@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getRequestId, recordServerError } from "@/lib/logger.server";
 import { buildAuthUrl } from "@/lib/providers/oura";
 
 const PROVIDER = "oura" as const;
@@ -34,16 +35,17 @@ export const Route = createFileRoute("/api/integrations/oura/authorize")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const requestId = getRequestId(request);
         const authHeader = request.headers.get("authorization") ?? "";
         if (!authHeader.startsWith("Bearer ")) {
-          return jsonResponse({ error: "Missing bearer token" }, 401);
+          return jsonResponse({ error: "Missing bearer token", requestId }, 401);
         }
         const token = authHeader.slice("Bearer ".length).trim();
-        if (!token) return jsonResponse({ error: "Empty bearer token" }, 401);
+        if (!token) return jsonResponse({ error: "Empty bearer token", requestId }, 401);
 
         const { data: userData, error: authErr } = await supabaseAdmin.auth.getUser(token);
         if (authErr || !userData?.user) {
-          return jsonResponse({ error: "Invalid token" }, 401);
+          return jsonResponse({ error: "Invalid token", requestId }, 401);
         }
         const userId = userData.user.id;
 
@@ -64,7 +66,14 @@ export const Route = createFileRoute("/api/integrations/oura/authorize")({
           expires_at: expiresAt,
         });
         if (insertErr) {
-          return jsonResponse({ error: `state persist failed: ${insertErr.message}` }, 500);
+          await recordServerError({
+            requestId,
+            userId,
+            route: "/api/integrations/oura/authorize",
+            action: "oauth_state_insert",
+            error: insertErr,
+          });
+          return jsonResponse({ error: `state persist failed: ${insertErr.message}`, requestId }, 500);
         }
 
         let url: string;
@@ -73,7 +82,14 @@ export const Route = createFileRoute("/api/integrations/oura/authorize")({
         } catch (e) {
           // env vars missing — clean up the orphan state row.
           await admin.from("oauth_state").delete().eq("state", state);
-          return jsonResponse({ error: (e as Error).message }, 500);
+          await recordServerError({
+            requestId,
+            userId,
+            route: "/api/integrations/oura/authorize",
+            action: "oura_auth_url_build",
+            error: e,
+          });
+          return jsonResponse({ error: (e as Error).message, requestId }, 500);
         }
 
         return jsonResponse({ url });
