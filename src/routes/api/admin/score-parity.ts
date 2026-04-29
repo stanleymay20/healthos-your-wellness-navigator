@@ -5,6 +5,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getRequestId, recordServerError } from "@/lib/logger.server";
 import { compareScoreParityForUser } from "@/lib/scoring/parity.server";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -27,25 +28,26 @@ export const Route = createFileRoute("/api/admin/score-parity")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const requestId = getRequestId(request);
         const adminSecret = process.env.BACKFILL_ADMIN_SECRET;
         if (!adminSecret) {
           return jsonResponse(
-            { error: "Score parity disabled: BACKFILL_ADMIN_SECRET not configured" },
+            { error: "Score parity disabled: BACKFILL_ADMIN_SECRET not configured", requestId },
             503,
           );
         }
 
         const authHeader = request.headers.get("authorization") ?? "";
         if (!authHeader.startsWith("Bearer ")) {
-          return jsonResponse({ error: "Missing bearer token" }, 401);
+          return jsonResponse({ error: "Missing bearer token", requestId }, 401);
         }
         const token = authHeader.slice("Bearer ".length).trim();
-        if (!token) return jsonResponse({ error: "Empty bearer token" }, 401);
+        if (!token) return jsonResponse({ error: "Empty bearer token", requestId }, 401);
 
         const { data: userData, error: authErr } =
           await supabaseAdmin.auth.getUser(token);
         if (authErr || !userData?.user) {
-          return jsonResponse({ error: "Invalid token" }, 401);
+          return jsonResponse({ error: "Invalid token", requestId }, 401);
         }
         const callerId = userData.user.id;
 
@@ -111,6 +113,7 @@ export const Route = createFileRoute("/api/admin/score-parity")({
           });
           return jsonResponse({
             ok: true,
+            requestId,
             userId: targetUserId,
             provider,
             startDate,
@@ -118,7 +121,15 @@ export const Route = createFileRoute("/api/admin/score-parity")({
             ...report,
           });
         } catch (e) {
-          return jsonResponse({ ok: false, error: (e as Error).message }, 500);
+          await recordServerError({
+            requestId,
+            userId: targetUserId,
+            route: "/api/admin/score-parity",
+            action: "score_parity",
+            error: e,
+            metadata: { startDate, endDate, provider, sampleLimit },
+          });
+          return jsonResponse({ ok: false, requestId, error: (e as Error).message }, 500);
         }
       },
     },

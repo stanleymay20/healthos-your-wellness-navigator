@@ -25,7 +25,9 @@ import { Route as AppLogsRouteImport } from './routes/_app/logs'
 import { Route as AppInsightsRouteImport } from './routes/_app/insights'
 import { Route as AppDevicesRouteImport } from './routes/_app/devices'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
 import { Route as ApiAdminScoreParityRouteImport } from './routes/api/admin/score-parity'
+import { Route as ApiAdminErrorsRouteImport } from './routes/api/admin/errors'
 import { Route as ApiAdminBackfillScoresRouteImport } from './routes/api/admin/backfill-scores'
 import { Route as ApiIntegrationsOuraSyncRouteImport } from './routes/api/integrations/oura/sync'
 import { Route as ApiIntegrationsOuraCallbackRouteImport } from './routes/api/integrations/oura/callback'
@@ -110,9 +112,19 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
+  id: '/api/public/health',
+  path: '/api/public/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminScoreParityRoute = ApiAdminScoreParityRouteImport.update({
   id: '/api/admin/score-parity',
   path: '/api/admin/score-parity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminErrorsRoute = ApiAdminErrorsRouteImport.update({
+  id: '/api/admin/errors',
+  path: '/api/admin/errors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdminBackfillScoresRoute = ApiAdminBackfillScoresRouteImport.update({
@@ -155,7 +167,9 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
+  '/api/admin/errors': typeof ApiAdminErrorsRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
@@ -177,7 +191,9 @@ export interface FileRoutesByTo {
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
+  '/api/admin/errors': typeof ApiAdminErrorsRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
@@ -201,7 +217,9 @@ export interface FileRoutesById {
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/api/admin/backfill-scores': typeof ApiAdminBackfillScoresRoute
+  '/api/admin/errors': typeof ApiAdminErrorsRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
   '/api/integrations/oura/callback': typeof ApiIntegrationsOuraCallbackRoute
   '/api/integrations/oura/sync': typeof ApiIntegrationsOuraSyncRoute
@@ -225,7 +243,9 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/api/admin/backfill-scores'
+    | '/api/admin/errors'
     | '/api/admin/score-parity'
+    | '/api/public/health'
     | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
@@ -247,7 +267,9 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/api/admin/backfill-scores'
+    | '/api/admin/errors'
     | '/api/admin/score-parity'
+    | '/api/public/health'
     | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
@@ -270,7 +292,9 @@ export interface FileRouteTypes {
     | '/_app/reports'
     | '/_app/settings'
     | '/api/admin/backfill-scores'
+    | '/api/admin/errors'
     | '/api/admin/score-parity'
+    | '/api/public/health'
     | '/api/integrations/oura/authorize'
     | '/api/integrations/oura/callback'
     | '/api/integrations/oura/sync'
@@ -286,7 +310,9 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiAdminBackfillScoresRoute: typeof ApiAdminBackfillScoresRoute
+  ApiAdminErrorsRoute: typeof ApiAdminErrorsRoute
   ApiAdminScoreParityRoute: typeof ApiAdminScoreParityRoute
+  ApiPublicHealthRoute: typeof ApiPublicHealthRoute
   ApiIntegrationsOuraAuthorizeRoute: typeof ApiIntegrationsOuraAuthorizeRoute
   ApiIntegrationsOuraCallbackRoute: typeof ApiIntegrationsOuraCallbackRoute
   ApiIntegrationsOuraSyncRoute: typeof ApiIntegrationsOuraSyncRoute
@@ -406,11 +432,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/health': {
+      id: '/api/public/health'
+      path: '/api/public/health'
+      fullPath: '/api/public/health'
+      preLoaderRoute: typeof ApiPublicHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/score-parity': {
       id: '/api/admin/score-parity'
       path: '/api/admin/score-parity'
       fullPath: '/api/admin/score-parity'
       preLoaderRoute: typeof ApiAdminScoreParityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/errors': {
+      id: '/api/admin/errors'
+      path: '/api/admin/errors'
+      fullPath: '/api/admin/errors'
+      preLoaderRoute: typeof ApiAdminErrorsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/backfill-scores': {
@@ -478,7 +518,9 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiAdminBackfillScoresRoute: ApiAdminBackfillScoresRoute,
+  ApiAdminErrorsRoute: ApiAdminErrorsRoute,
   ApiAdminScoreParityRoute: ApiAdminScoreParityRoute,
+  ApiPublicHealthRoute: ApiPublicHealthRoute,
   ApiIntegrationsOuraAuthorizeRoute: ApiIntegrationsOuraAuthorizeRoute,
   ApiIntegrationsOuraCallbackRoute: ApiIntegrationsOuraCallbackRoute,
   ApiIntegrationsOuraSyncRoute: ApiIntegrationsOuraSyncRoute,
