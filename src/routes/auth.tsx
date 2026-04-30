@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -61,6 +62,22 @@ function AuthPage() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined,
+        extraParams: { prompt: "select_account" },
+      });
+      if (result.error) throw result.error;
+      if (!result.redirected) navigate({ to: "/dashboard" });
+    } catch (err) {
+      toast.error((err as Error).message ?? "Google sign-in failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const title = mode === "signin" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset your password";
   const subtitle =
     mode === "signin"
@@ -97,7 +114,26 @@ function AuthPage() {
           <div className="lg:hidden mb-8"><Link to="/"><Logo /></Link></div>
           <h1 className="text-3xl font-bold">{title}</h1>
           <p className="mt-2 text-muted-foreground">{subtitle}</p>
-          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          {mode !== "forgot" && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={loading}
+                onClick={handleGoogleSignIn}
+                className="mt-8 w-full h-11 rounded-xl"
+              >
+                <span className="mr-2 font-bold">G</span>
+                Continue with Google
+              </Button>
+              <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="h-px flex-1 bg-border" />
+                <span>or</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
+          <form className={mode === "forgot" ? "mt-8 space-y-4" : "space-y-4"} onSubmit={handleSubmit}>
             {mode === "signup" && (
               <div className="space-y-2">
                 <Label htmlFor="name">Full name</Label>
