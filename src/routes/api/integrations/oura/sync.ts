@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { syncOuraForUser, SyncLockHeldError } from "@/lib/providers/oura-sync.server";
+import { captureException } from "@/lib/monitoring/sentry.server";
 import { getClientIp, secureJsonResponse } from "@/lib/api/response";
 import { enforceRateLimit } from "@/lib/rate-limit/limiter";
 
@@ -46,6 +47,11 @@ export const Route = createFileRoute("/api/integrations/oura/sync")({
               409,
             );
           }
+          void captureException(e, {
+            route: "POST /api/integrations/oura/sync",
+            userId: userData.user.id,
+            event: "oura_sync.manual_failed",
+          });
           return secureJsonResponse({ ok: false, error: (e as Error).message }, 502);
         }
       },

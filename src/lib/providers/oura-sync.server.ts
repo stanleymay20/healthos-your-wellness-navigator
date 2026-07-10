@@ -17,6 +17,7 @@ import {
   type BaselineScoreInput,
 } from "@/lib/scoring/baseline";
 import { logger } from "@/lib/log/logger";
+import { captureException } from "@/lib/monitoring/sentry.server";
 
 const PROVIDER = "oura" as const;
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -561,6 +562,17 @@ async function runSyncOuraForUser(
       tokenProblem,
       error: message,
     });
+    // Skip Sentry for token-revoked and lock-contention paths — those are
+    // expected outcomes (user needs to reconnect / another sync is in
+    // flight), not incidents worth paging on.
+    if (!tokenProblem && !(e instanceof SyncLockHeldError)) {
+      void captureException(e, {
+        route: "syncOuraForUser",
+        userId,
+        event: "oura_sync.failed",
+        tags: { provider: PROVIDER },
+      });
+    }
     await admin
       .from("device_connections")
       .update({

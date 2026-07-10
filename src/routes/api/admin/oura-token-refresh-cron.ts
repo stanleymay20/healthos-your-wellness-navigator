@@ -13,6 +13,7 @@ import { logger } from "@/lib/log/logger";
 import { getClientIp, secureJsonResponse } from "@/lib/api/response";
 import { enforceRateLimit } from "@/lib/rate-limit/limiter";
 import { recordAdminAudit, type AdminAuditFields } from "@/lib/audit/admin.server";
+import { captureException } from "@/lib/monitoring/sentry.server";
 
 const ROUTE = "POST /api/admin/oura-token-refresh-cron";
 const RATE_LIMIT = 60;
@@ -82,6 +83,10 @@ export const Route = createFileRoute("/api/admin/oura-token-refresh-cron")({
         } catch (e) {
           const message = (e as Error).message;
           logger.error({ event: "oura_token_refresh_cron.failed", error: message });
+          void captureException(e, {
+            route: ROUTE,
+            event: "oura_token_refresh_cron.failed",
+          });
           const res = secureJsonResponse({ ok: false, error: message }, 500);
           await recordAdminAudit({
             ...auditBase,
