@@ -14,6 +14,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getClientIp, secureJsonResponse } from "@/lib/api/response";
 import { enforceRateLimit } from "@/lib/rate-limit/limiter";
 import { logger } from "@/lib/log/logger";
+import {
+  sendDeletionCancelledEmail,
+  sendDeletionScheduledEmail,
+} from "@/lib/email/index.server";
 
 const RATE_LIMIT = 3;
 const RATE_WINDOW_SEC = 3600;
@@ -22,7 +26,7 @@ const GRACE_DAYS = 30;
 type AnyAdmin = { from: (t: string) => any };
 
 async function authenticate(request: Request): Promise<
-  | { userId: string }
+  | { userId: string; userEmail: string | null }
   | { error: Response }
 > {
   const authHeader = request.headers.get("authorization") ?? "";
@@ -37,7 +41,7 @@ async function authenticate(request: Request): Promise<
   if (authErr || !userData?.user) {
     return { error: secureJsonResponse({ error: "Invalid token" }, 401) };
   }
-  return { userId: userData.user.id };
+  return { userId: userData.user.id, userEmail: userData.user.email ?? null };
 }
 
 export const Route = createFileRoute("/api/me/delete")({
@@ -57,6 +61,7 @@ export const Route = createFileRoute("/api/me/delete")({
         const auth = await authenticate(request);
         if ("error" in auth) return auth.error;
         const userId = auth.userId;
+        const userEmail = auth.userEmail;
 
         // Require explicit confirmation in the body so accidental
         // navigation / curl can't enqueue a deletion.
@@ -109,6 +114,15 @@ export const Route = createFileRoute("/api/me/delete")({
           scheduled_for: scheduledFor.toISOString(),
           requester_ip: callerIp,
         });
+        if (userEmail) {
+          // Fire-and-forget confirmation email. Never block the response —
+          // the deletion is already scheduled at this point.
+          void sendDeletionScheduledEmail({
+            to: userEmail,
+            scheduledFor,
+            graceDays: GRACE_DAYS,
+          });
+        }
         return secureJsonResponse({
           ok: true,
           scheduledFor: scheduledFor.toISOString(),
@@ -129,6 +143,7 @@ export const Route = createFileRoute("/api/me/delete")({
         const auth = await authenticate(request);
         if ("error" in auth) return auth.error;
         const userId = auth.userId;
+        const userEmail = auth.userEmail;
 
         const admin = supabaseAdmin as unknown as AnyAdmin;
         // Only flag rows that haven't been hard-deleted already (executed_at
@@ -158,6 +173,12 @@ export const Route = createFileRoute("/api/me/delete")({
           userId,
           had_pending_row: !!data,
         });
+        // Only send the cancellation confirmation when we actually flipped
+        // a pending row — a stale DELETE with no pending deletion shouldn't
+        // trigger a misleading "we cancelled it" email.
+        if (userEmail && data) {
+          void sendDeletionCancelledEmail({ to: userEmail });
+        }
         return secureJsonResponse({ ok: true, cancelled: !!data });
       },
     },
