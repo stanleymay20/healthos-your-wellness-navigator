@@ -1,8 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { MarketingHeader } from "@/components/landing/Header";
 import { MarketingFooter } from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { startCheckout } from "@/lib/billing/client-actions";
+import { isKnownPlan, type PlanSlug } from "@/lib/billing/plans";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -16,9 +21,21 @@ export const Route = createFileRoute("/pricing")({
   component: Pricing,
 });
 
-const tiers = [
+type Tier = {
+  name: string;
+  slug: "free" | PlanSlug;
+  price: string;
+  period: string;
+  desc: string;
+  features: string[];
+  cta: string;
+  highlight: boolean;
+};
+
+const tiers: Tier[] = [
   {
     name: "Free",
+    slug: "free",
     price: "$0",
     period: "forever",
     desc: "Get started with daily tracking and core insights.",
@@ -28,15 +45,17 @@ const tiers = [
   },
   {
     name: "Pro",
+    slug: "pro",
     price: "$12",
     period: "/month",
     desc: "AI coaching, predictions, and unlimited integrations.",
     features: ["Everything in Free", "AI recommendations", "Risk forecasts", "Unlimited devices", "Weekly reports", "Priority support"],
-    cta: "Start 14-day Trial",
+    cta: "Start Pro",
     highlight: true,
   },
   {
     name: "Family",
+    slug: "family",
     price: "$24",
     period: "/month",
     desc: "Up to 5 members on one plan.",
@@ -47,6 +66,59 @@ const tiers = [
 ];
 
 function Pricing() {
+  const { session } = useAuth();
+  const navigate = useNavigate();
+  const [busySlug, setBusySlug] = useState<PlanSlug | null>(null);
+
+  async function chooseTier(tier: Tier) {
+    // Free tier — either sign up (unauth'd) or land on the app.
+    if (tier.slug === "free") {
+      navigate({ to: session ? "/dashboard" : "/auth" });
+      return;
+    }
+    // Paid tier without a session — bounce to auth and remember the intent
+    // via a query param so we can resume after login. The auth flow can
+    // read ?plan= and route back here.
+    if (!session?.access_token) {
+      navigate({ to: "/auth", search: { plan: tier.slug } as unknown as never });
+      return;
+    }
+    setBusySlug(tier.slug);
+    const res = await startCheckout(session.access_token, tier.slug);
+    setBusySlug(null);
+    if (!res.ok) {
+      toast.error(`Couldn't start checkout: ${res.error}`);
+      return;
+    }
+    window.location.href = res.url;
+  }
+
+  // If we returned to /pricing from a cancelled checkout or resumed from a
+  // ?plan=… auth redirect, show one relevant message on mount.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "cancelled") {
+      toast("Checkout cancelled. No charge was made.");
+      params.delete("checkout");
+      const search = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${search ? `?${search}` : ""}`,
+      );
+    }
+    // Resume-from-auth: if the user came back with ?plan=<slug> and is
+    // signed in, auto-open checkout for that plan.
+    const planParam = params.get("plan");
+    if (session?.access_token && planParam && isKnownPlan(planParam)) {
+      const tier = tiers.find((t) => t.slug === planParam);
+      if (tier) void chooseTier(tier);
+    }
+    // Intentional: run once on mount. If session arrives after mount and
+    // ?plan= is set, the user can click the CTA manually.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <MarketingHeader />
@@ -81,17 +153,17 @@ function Pricing() {
                   </li>
                 ))}
               </ul>
-              <Link to="/auth" className="block mt-8">
-                <Button
-                  className={`w-full h-11 rounded-xl ${
-                    t.highlight
-                      ? "bg-accent text-accent-foreground hover:opacity-95"
-                      : "bg-gradient-brand text-primary-foreground"
-                  }`}
-                >
-                  {t.cta}
-                </Button>
-              </Link>
+              <Button
+                onClick={() => chooseTier(t)}
+                disabled={busySlug !== null && busySlug !== t.slug ? true : busySlug === t.slug}
+                className={`mt-8 w-full h-11 rounded-xl ${
+                  t.highlight
+                    ? "bg-accent text-accent-foreground hover:opacity-95"
+                    : "bg-gradient-brand text-primary-foreground"
+                }`}
+              >
+                {busySlug === t.slug ? "Starting…" : t.cta}
+              </Button>
             </div>
           ))}
         </div>

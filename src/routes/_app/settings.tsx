@@ -21,6 +21,7 @@ import {
   DOC_URLS,
   type ConsentDoc,
 } from "@/lib/consent/versions";
+import { BillingSection } from "@/components/settings/BillingSection";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — HealthOS" }] }),
@@ -65,6 +66,25 @@ function Section({ title, desc, children }: { title: string; desc: string; child
 function Settings() {
   const { user, session } = useAuth();
   const [loading, setLoading] = useState(true);
+
+  // Post-checkout return: Stripe redirects to /settings?checkout=success.
+  // Surface a toast once, then strip the param so a reload doesn't
+  // re-fire it. The subscriptions row may take a beat to hydrate after
+  // the webhook lands; a quick reload after a moment picks it up.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      toast.success("Thanks for subscribing — your plan is being activated.");
+      params.delete("checkout");
+      const search = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${search ? `?${search}` : ""}`,
+      );
+    }
+  }, []);
+
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [healthGoal, setHealthGoal] = useState<string>("");
@@ -303,6 +323,13 @@ function Settings() {
           {saving ? "Saving..." : "Save changes"}
         </Button>
       </header>
+
+      <Section title="Billing" desc="Your HealthOS plan.">
+        <BillingSection
+          userId={user?.id ?? null}
+          accessToken={session?.access_token ?? null}
+        />
+      </Section>
 
       <Section title="Profile" desc="Your basic information.">
         <div className="grid sm:grid-cols-2 gap-4">
