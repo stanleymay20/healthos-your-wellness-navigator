@@ -28,6 +28,9 @@ import { Route as AppDevicesRouteImport } from './routes/_app/devices'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as ApiMeExportRouteImport } from './routes/api/me/export'
 import { Route as ApiMeDeleteRouteImport } from './routes/api/me/delete'
+import { Route as ApiBillingWebhookRouteImport } from './routes/api/billing/webhook'
+import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
+import { Route as ApiBillingCheckoutRouteImport } from './routes/api/billing/checkout'
 import { Route as ApiAdminScoreParityRouteImport } from './routes/api/admin/score-parity'
 import { Route as ApiAdminOuraTokenRefreshCronRouteImport } from './routes/api/admin/oura-token-refresh-cron'
 import { Route as ApiAdminOuraSyncCronRouteImport } from './routes/api/admin/oura-sync-cron'
@@ -130,6 +133,21 @@ const ApiMeDeleteRoute = ApiMeDeleteRouteImport.update({
   path: '/api/me/delete',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBillingWebhookRoute = ApiBillingWebhookRouteImport.update({
+  id: '/api/billing/webhook',
+  path: '/api/billing/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
+  id: '/api/billing/portal',
+  path: '/api/billing/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingCheckoutRoute = ApiBillingCheckoutRouteImport.update({
+  id: '/api/billing/checkout',
+  path: '/api/billing/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminScoreParityRoute = ApiAdminScoreParityRouteImport.update({
   id: '/api/admin/score-parity',
   path: '/api/admin/score-parity',
@@ -190,6 +208,9 @@ export interface FileRoutesByFullPath {
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/oura-token-refresh-cron': typeof ApiAdminOuraTokenRefreshCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/me/delete': typeof ApiMeDeleteRoute
   '/api/me/export': typeof ApiMeExportRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
@@ -217,6 +238,9 @@ export interface FileRoutesByTo {
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/oura-token-refresh-cron': typeof ApiAdminOuraTokenRefreshCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/me/delete': typeof ApiMeDeleteRoute
   '/api/me/export': typeof ApiMeExportRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
@@ -246,6 +270,9 @@ export interface FileRoutesById {
   '/api/admin/oura-sync-cron': typeof ApiAdminOuraSyncCronRoute
   '/api/admin/oura-token-refresh-cron': typeof ApiAdminOuraTokenRefreshCronRoute
   '/api/admin/score-parity': typeof ApiAdminScoreParityRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/me/delete': typeof ApiMeDeleteRoute
   '/api/me/export': typeof ApiMeExportRoute
   '/api/integrations/oura/authorize': typeof ApiIntegrationsOuraAuthorizeRoute
@@ -275,6 +302,9 @@ export interface FileRouteTypes {
     | '/api/admin/oura-sync-cron'
     | '/api/admin/oura-token-refresh-cron'
     | '/api/admin/score-parity'
+    | '/api/billing/checkout'
+    | '/api/billing/portal'
+    | '/api/billing/webhook'
     | '/api/me/delete'
     | '/api/me/export'
     | '/api/integrations/oura/authorize'
@@ -302,6 +332,9 @@ export interface FileRouteTypes {
     | '/api/admin/oura-sync-cron'
     | '/api/admin/oura-token-refresh-cron'
     | '/api/admin/score-parity'
+    | '/api/billing/checkout'
+    | '/api/billing/portal'
+    | '/api/billing/webhook'
     | '/api/me/delete'
     | '/api/me/export'
     | '/api/integrations/oura/authorize'
@@ -330,6 +363,9 @@ export interface FileRouteTypes {
     | '/api/admin/oura-sync-cron'
     | '/api/admin/oura-token-refresh-cron'
     | '/api/admin/score-parity'
+    | '/api/billing/checkout'
+    | '/api/billing/portal'
+    | '/api/billing/webhook'
     | '/api/me/delete'
     | '/api/me/export'
     | '/api/integrations/oura/authorize'
@@ -351,6 +387,9 @@ export interface RootRouteChildren {
   ApiAdminOuraSyncCronRoute: typeof ApiAdminOuraSyncCronRoute
   ApiAdminOuraTokenRefreshCronRoute: typeof ApiAdminOuraTokenRefreshCronRoute
   ApiAdminScoreParityRoute: typeof ApiAdminScoreParityRoute
+  ApiBillingCheckoutRoute: typeof ApiBillingCheckoutRoute
+  ApiBillingPortalRoute: typeof ApiBillingPortalRoute
+  ApiBillingWebhookRoute: typeof ApiBillingWebhookRoute
   ApiMeDeleteRoute: typeof ApiMeDeleteRoute
   ApiMeExportRoute: typeof ApiMeExportRoute
   ApiIntegrationsOuraAuthorizeRoute: typeof ApiIntegrationsOuraAuthorizeRoute
@@ -493,6 +532,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeDeleteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/billing/webhook': {
+      id: '/api/billing/webhook'
+      path: '/api/billing/webhook'
+      fullPath: '/api/billing/webhook'
+      preLoaderRoute: typeof ApiBillingWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/portal': {
+      id: '/api/billing/portal'
+      path: '/api/billing/portal'
+      fullPath: '/api/billing/portal'
+      preLoaderRoute: typeof ApiBillingPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/checkout': {
+      id: '/api/billing/checkout'
+      path: '/api/billing/checkout'
+      fullPath: '/api/billing/checkout'
+      preLoaderRoute: typeof ApiBillingCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/score-parity': {
       id: '/api/admin/score-parity'
       path: '/api/admin/score-parity'
@@ -583,6 +643,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminOuraSyncCronRoute: ApiAdminOuraSyncCronRoute,
   ApiAdminOuraTokenRefreshCronRoute: ApiAdminOuraTokenRefreshCronRoute,
   ApiAdminScoreParityRoute: ApiAdminScoreParityRoute,
+  ApiBillingCheckoutRoute: ApiBillingCheckoutRoute,
+  ApiBillingPortalRoute: ApiBillingPortalRoute,
+  ApiBillingWebhookRoute: ApiBillingWebhookRoute,
   ApiMeDeleteRoute: ApiMeDeleteRoute,
   ApiMeExportRoute: ApiMeExportRoute,
   ApiIntegrationsOuraAuthorizeRoute: ApiIntegrationsOuraAuthorizeRoute,
