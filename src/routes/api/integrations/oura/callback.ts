@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { supabaseAdminExtended } from "@/integrations/supabase/client.extended.server";
 import { getRequestId, recordServerError } from "@/lib/logger.server";
 import { exchangeCodeForTokens } from "@/lib/providers/oura";
 
@@ -36,11 +36,7 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
         if (!state) return badRequest("missing state");
         if (!code) return badRequest("missing code");
 
-        // Cast to bypass generated-types lookup for tables not yet in
-        // src/integrations/supabase/types.ts. This is a server-only file.
-        const admin = supabaseAdmin as unknown as {
-          from: (t: string) => any;
-        };
+        const admin = supabaseAdminExtended;
 
         // 1. Look up the pending handshake. Single-use: delete after use.
         const { data: stateRow, error: stateErr } = await admin
@@ -60,19 +56,19 @@ export const Route = createFileRoute("/api/integrations/oura/callback")({
         }
         if (!stateRow) return badRequest("state not found");
         if (stateRow.provider !== PROVIDER) return badRequest("state provider mismatch");
-        if (new Date(stateRow.expires_at as string).getTime() < Date.now()) {
+        if (new Date(stateRow.expires_at).getTime() < Date.now()) {
           await admin.from("oauth_state").delete().eq("state", state);
           return badRequest("state expired");
         }
 
-        const userId = stateRow.user_id as string;
+        const userId = stateRow.user_id;
 
         // 2. Exchange code for tokens. Server-only — uses OURA_CLIENT_SECRET.
         let tokens;
         try {
           tokens = await exchangeCodeForTokens({
             code,
-            codeVerifier: (stateRow.code_verifier as string | null) ?? undefined,
+            codeVerifier: stateRow.code_verifier ?? undefined,
           });
         } catch (e) {
           // Surface the failure on the connection row so the user sees it,
