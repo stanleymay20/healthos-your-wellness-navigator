@@ -1,8 +1,7 @@
 // Server-only. Orchestrates a minimal Oura → HealthOS sync for a single user.
-// No background jobs, no refresh-token flow, no health_logs writes — those
-// are intentional follow-ups.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { supabaseAdminExtended } from "@/integrations/supabase/client.extended.server";
+import type { Json } from "@/integrations/supabase/types";
 import {
   OURA_API_BASE,
   refreshAccessToken,
@@ -14,13 +13,8 @@ import { generateInsights } from "@/lib/insights/generate";
 
 const PROVIDER = "oura" as const;
 const DEFAULT_LOOKBACK_DAYS = 14;
-// Refresh tokens whose access_token expires within this window, so we avoid
-// burning a request on a near-dead token.
 const EXPIRY_SKEW_MS = 60_000;
 
-// Canonical sync-generated insights. Keyed by the exact title string the
-// pure generator emits; lets us (a) enrich with description/type/severity
-// and (b) scope the idempotent delete to this set of titles only.
 type InsightTone = "positive" | "warning" | "neutral";
 type InsightLevel = "low" | "medium" | "high";
 const SYNC_INSIGHT_CATALOG: Record<
@@ -49,10 +43,6 @@ const SYNC_INSIGHT_CATALOG: Record<
   },
 };
 
-// Thrown only when the upstream signal clearly indicates the stored token
-// is no longer usable (revoked, expired beyond refresh, scope stripped,
-// user deleted on the provider side). Any other failure is considered
-// transient and must not flip the connection to disconnected.
 class TokenRevokedError extends Error {
   constructor(message: string) {
     super(message);
@@ -60,13 +50,22 @@ class TokenRevokedError extends Error {
   }
 }
 
-type OuraDailyRecord = Record<string, unknown> & {
-  day?: unknown;
-  score?: unknown;
+type OuraDailyRecord = Record<string, Json | undefined> & {
+  day?: Json;
+  score?: Json;
 };
 type DailyPoint = { day: string; score: number | null; raw: OuraDailyRecord };
 type DailyResponse = { data?: OuraDailyRecord[] };
 type RecordType = "sleep" | "readiness" | "activity";
+type SnapshotInsert = {
+  user_id: string;
+  provider: string;
+  record_date: string;
+  record_type: RecordType;
+  score: number | null;
+  payload: Json;
+  fetched_at: string;
+};
 
 export type SyncOutcome = {
   daysWritten: number;
@@ -113,7 +112,7 @@ function buildSnapshotRows(
   userId: string,
   recordType: RecordType,
   points: DailyPoint[],
-): Array<Record<string, unknown>> {
+): SnapshotInsert[] {
   const fetchedAt = new Date().toISOString();
   return points.map((p) => ({
     user_id: userId,
@@ -126,15 +125,11 @@ function buildSnapshotRows(
   }));
 }
 
-// Refreshes Oura tokens and persists the rotated pair. If the refresh token
-// itself is dead, drops the stored token row and throws TokenRevokedError so
-// the outer catch marks the connection disconnected — forcing a clean
-// reconnect flow rather than looping on a bad refresh token.
 async function refreshAndPersist(
   userId: string,
   refreshToken: string,
 ): Promise<{ access_token: string; refresh_token: string | null }> {
-  const admin = supabaseAdmin as unknown as { from: (t: string) => any };
+  const admin = supabaseAdminExtended;
   let fresh;
   try {
     fresh = await refreshAccessToken({ refreshToken });
@@ -169,10 +164,8 @@ async function refreshAndPersist(
 }
 
 export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
-  const admin = supabaseAdmin as unknown as { from: (t: string) => any };
+  const admin = supabaseAdminExtended;
 
-  // 1. Mark the connection as syncing so the UI can reflect it. Errors here
-  //    are non-fatal (the row may not exist if state is mid-rebuild).
   await admin
     .from("device_connections")
     .update({ status: "syncing", sync_error: null })
@@ -180,9 +173,6 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     .eq("provider", PROVIDER);
 
   try {
-    // 2. Load the stored token row. Pre-flight refresh if the access token
-    //    is about to expire; surface reconnect when the refresh token itself
-    //    is invalid.
     const { data: tokenRow, error: tokenErr } = await admin
       .from("device_oauth_tokens")
       .select("access_token, refresh_token, expires_at")
@@ -194,9 +184,9 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     if (!tokenRow?.access_token) {
       throw new TokenRevokedError("No Oura connection found for this user.");
     }
-    let accessToken = tokenRow.access_token as string;
-    let refreshToken = (tokenRow.refresh_token as string | null) ?? null;
-    const expiresAt = (tokenRow.expires_at as string | null) ?? null;
+    let accessToken = tokenRow.access_token;
+    let refreshToken = tokenRow.refresh_token ?? null;
+    const expiresAt = tokenRow.expires_at ?? null;
 
     const expiresSoon =
       !!expiresAt && new Date(expiresAt).getTime() - Date.now() <= EXPIRY_SKEW_MS;
@@ -206,8 +196,6 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       refreshToken = fresh.refresh_token;
     }
 
-    // 3. Determine the date window. Use synced_through as the start cursor;
-    //    fall back to a short lookback for the first sync.
     const { data: connRow } = await admin
       .from("device_connections")
       .select("synced_through")
@@ -219,23 +207,23 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
     const endDate = isoDate(today);
     let startDate: string;
     if (connRow?.synced_through) {
-      startDate = connRow.synced_through as string;
+      startDate = connRow.synced_through;
     } else {
       const back = new Date(today);
       back.setDate(back.getDate() - DEFAULT_LOOKBACK_DAYS);
       startDate = isoDate(back);
     }
 
-    // 4. Pull the three daily collections in parallel. If the token has
-     //   been revoked provider-side we may hit 401 mid-flight — refresh
-     //   once and retry the whole batch.
-    const pullAll = (tok: string) => Promise.all([
-      fetchDaily(tok, "daily_sleep", startDate, endDate),
-      fetchDaily(tok, "daily_readiness", startDate, endDate),
-      fetchDaily(tok, "daily_activity", startDate, endDate),
-    ]);
+    const pullAll = (tok: string) =>
+      Promise.all([
+        fetchDaily(tok, "daily_sleep", startDate, endDate),
+        fetchDaily(tok, "daily_readiness", startDate, endDate),
+        fetchDaily(tok, "daily_activity", startDate, endDate),
+      ]);
 
-    let sleep, readiness, activity;
+    let sleep: DailyPoint[];
+    let readiness: DailyPoint[];
+    let activity: DailyPoint[];
     try {
       [sleep, readiness, activity] = await pullAll(accessToken);
     } catch (err) {
@@ -249,10 +237,6 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       }
     }
 
-    // 5a. Persist raw snapshots for every fetched day, regardless of whether
-    //     we can compute a health_scores row from them. This is a dual-write
-    //     alongside the existing health_scores upsert — later phases can
-    //     derive scores from these snapshots rather than the live API.
     const snapshotRows = [
       ...buildSnapshotRows(userId, "sleep", sleep),
       ...buildSnapshotRows(userId, "readiness", readiness),
@@ -267,24 +251,14 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
       if (snapErr) throw new Error(`snapshot upsert failed: ${snapErr.message}`);
     }
 
-    // 5. Derive health_scores rows via the shared pure rule, then delegate
-    //    persistence to persistDerivedScores — the same writer used by the
-    //    backfill path. Behavior is unchanged: same upsert key, same
-    //    idempotency, same error shape. This removes the duplicated inline
-    //    upsert from the live sync.
     const derivationInputs: SnapshotInput[] = snapshotRows.map((r) => ({
-      record_date: r.record_date as string,
-      record_type: r.record_type as SnapshotInput["record_type"],
-      score: (r.score as number | null) ?? null,
+      record_date: r.record_date,
+      record_type: r.record_type,
+      score: r.score,
     }));
     const derived = deriveDailyScores(derivationInputs);
     const { daysWritten } = await persistDerivedScores(userId, derived);
 
-    // 5b. Generate post-sync insights from the two most recent score rows
-    //     and persist them under the existing insights table. Idempotent
-    //     across repeated syncs on the same day: delete today's rows with
-    //     known sync-generated titles, then insert the fresh batch.
-    //     Failures are non-fatal — insights are advisory.
     try {
       const { data: recent } = await admin
         .from("health_scores")
@@ -323,11 +297,9 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
         }
       }
     } catch (err) {
-      // Non-fatal — insights are advisory.
       console.warn(`[oura-sync] insight persistence failed for ${userId}:`, (err as Error).message);
     }
 
-    // 6. Mark success.
     const { error: connUpdateErr } = await admin
       .from("device_connections")
       .update({
@@ -342,11 +314,6 @@ export async function syncOuraForUser(userId: string): Promise<SyncOutcome> {
 
     return { daysWritten, syncedThrough: endDate };
   } catch (e) {
-    // 7. Only flip to disconnected when the token itself is the problem
-    //    (401/403 from Oura, or the row is gone). Everything else — network
-    //    hiccups, 5xx, 429 rate limits, DB errors — is transient: keep the
-    //    connection logically connected, record the error, and leave
-    //    last_synced_at untouched so the user can see "last success" state.
     const message = (e as Error).message.slice(0, 500);
     const tokenProblem = e instanceof TokenRevokedError;
     await admin
