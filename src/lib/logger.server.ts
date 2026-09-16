@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Json } from "@/integrations/supabase/types";
 
 type LogSeverity = "info" | "warn" | "error";
 
@@ -9,7 +10,7 @@ type ErrorInput = {
   action: string;
   severity?: LogSeverity;
   error: unknown;
-  metadata?: Record<string, unknown>;
+  metadata?: Json;
 };
 
 export function getRequestId(request: Request): string {
