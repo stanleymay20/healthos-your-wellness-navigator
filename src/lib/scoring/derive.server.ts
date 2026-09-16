@@ -3,7 +3,7 @@
 // health_scores — callers decide whether to persist. A later phase can
 // add a writer once we're ready to cut over from the inline sync path.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { supabaseAdminExtended } from "@/integrations/supabase/client.extended.server";
 import {
   deriveDailyScores,
   type DerivedDailyScore,
@@ -27,9 +27,8 @@ export async function deriveScoresFromSnapshotsForUser(args: {
   provider?: string;
 }): Promise<DerivedDailyScore[]> {
   const provider = args.provider ?? "oura";
-  const admin = supabaseAdmin as unknown as { from: (t: string) => any };
 
-  const { data, error } = await admin
+  const { data, error } = await supabaseAdminExtended
     .from("wearable_daily_snapshots")
     .select("record_date, record_type, score")
     .eq("user_id", args.userId)
