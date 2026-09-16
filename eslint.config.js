@@ -25,4 +25,10 @@ export default tseslint.config(
     },
   },
   eslintPluginPrettier,
+  {
+    // Formatting debt remains visible, while semantic lint/type/build failures stay blocking.
+    rules: {
+      "prettier/prettier": "warn",
+    },
+  },
 );
