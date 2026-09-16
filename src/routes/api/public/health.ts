@@ -17,8 +17,9 @@ export const Route = createFileRoute("/api/public/health")({
         const startedAt = Date.now();
 
         try {
-          const admin = supabaseAdmin as unknown as { from: (table: string) => any };
-          const { error } = await admin.from("profiles").select("id", { count: "exact", head: true });
+          const { error } = await supabaseAdmin
+            .from("profiles")
+            .select("id", { count: "exact", head: true });
           if (error) throw error;
 
           return jsonResponse({

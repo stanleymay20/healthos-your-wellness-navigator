@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { supabaseAdminExtended } from "@/integrations/supabase/client.extended.server";
 import { getRequestId, recordServerError } from "@/lib/logger.server";
 import { buildAuthUrl } from "@/lib/providers/oura";
 
@@ -55,10 +56,7 @@ export const Route = createFileRoute("/api/integrations/oura/authorize")({
         const codeChallenge = await s256Challenge(codeVerifier);
         const expiresAt = new Date(Date.now() + STATE_TTL_MS).toISOString();
 
-        // oauth_state isn't in the generated types yet — server-only table.
-        const admin = supabaseAdmin as unknown as { from: (t: string) => any };
-
-        const { error: insertErr } = await admin.from("oauth_state").insert({
+        const { error: insertErr } = await supabaseAdminExtended.from("oauth_state").insert({
           state,
           user_id: userId,
           provider: PROVIDER,
@@ -81,7 +79,7 @@ export const Route = createFileRoute("/api/integrations/oura/authorize")({
           url = buildAuthUrl({ state, codeChallenge });
         } catch (e) {
           // env vars missing — clean up the orphan state row.
-          await admin.from("oauth_state").delete().eq("state", state);
+          await supabaseAdminExtended.from("oauth_state").delete().eq("state", state);
           await recordServerError({
             requestId,
             userId,

@@ -40,8 +40,7 @@ export const Route = createFileRoute("/api/admin/errors")({
         const severity = url.searchParams.get("severity");
 
         try {
-          const admin = supabaseAdmin as unknown as { from: (table: string) => any };
-          let query = admin
+          let query = supabaseAdmin
             .from("app_errors")
             .select("id, request_id, user_id, route, action, severity, message, metadata, created_at")
             .order("created_at", { ascending: false })

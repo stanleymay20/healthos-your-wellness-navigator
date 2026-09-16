@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Json } from "@/integrations/supabase/types";
 
 type LogSeverity = "info" | "warn" | "error";
 
@@ -9,7 +10,7 @@ type ErrorInput = {
   action: string;
   severity?: LogSeverity;
   error: unknown;
-  metadata?: Record<string, unknown>;
+  metadata?: Json;
 };
 
 export function getRequestId(request: Request): string {
@@ -35,8 +36,7 @@ export async function recordServerError(input: ErrorInput): Promise<void> {
 
   console.error(JSON.stringify({ event: "server_error", ...payload }));
 
-  const admin = supabaseAdmin as unknown as { from: (table: string) => any };
-  const { error: insertError } = await admin.from("app_errors").insert(payload);
+  const { error: insertError } = await supabaseAdmin.from("app_errors").insert(payload);
   if (insertError) {
     console.error(
       JSON.stringify({

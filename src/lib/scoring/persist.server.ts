@@ -19,7 +19,6 @@ export async function persistDerivedScores(
 ): Promise<PersistOutcome> {
   if (rows.length === 0) return { daysWritten: 0 };
 
-  const admin = supabaseAdmin as unknown as { from: (t: string) => any };
   const payload = rows.map((d) => ({
     user_id: userId,
     score_date: d.score_date,
@@ -29,7 +28,7 @@ export async function persistDerivedScores(
     activity_score: d.activity_score,
   }));
 
-  const { error } = await admin
+  const { error } = await supabaseAdmin
     .from("health_scores")
     .upsert(payload, { onConflict: "user_id,score_date" });
   if (error) throw new Error(`health_scores upsert failed: ${error.message}`);

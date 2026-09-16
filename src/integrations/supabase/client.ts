@@ -2,10 +2,14 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+type ViteImportMeta = ImportMeta & {
+  env?: Record<string, string | undefined>;
+};
+
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
-  const env = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+  const env = (import.meta as ViteImportMeta).env ?? {};
   const proc = (typeof process !== 'undefined' && process.env) || {};
   const SUPABASE_URL =
     env.VITE_SUPABASE_URL ||
@@ -41,4 +45,3 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     return Reflect.get(_supabase, prop, receiver);
   },
 });
-
