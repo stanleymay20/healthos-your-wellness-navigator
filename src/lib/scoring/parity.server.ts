@@ -13,9 +13,7 @@ export async function compareScoreParityForUser(args: {
   provider?: string;
   sampleLimit?: number;
 }): Promise<ParityReport> {
-  const admin = supabaseAdmin as unknown as { from: (t: string) => any };
-
-  const { data, error } = await admin
+  const { data, error } = await supabaseAdmin
     .from("health_scores")
     .select("score_date, overall_score, sleep_score, recovery_score, activity_score")
     .eq("user_id", args.userId)
