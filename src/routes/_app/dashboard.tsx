@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -463,7 +463,7 @@ function WeeklyInsightCard({ scores }: { scores: HealthScore[] }) {
   );
 }
 
-function KpiCard({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone: "warning" | "primary" | "accent" }) {
+function KpiCard({ icon: Icon, label, value, tone }: { icon: ComponentType<{ className?: string }>; label: string; value: string; tone: "warning" | "primary" | "accent" }) {
   const colors = {
     warning: "bg-warning/15 text-warning",
     primary: "bg-primary/10 text-primary",
