@@ -35,8 +35,7 @@ export async function recordServerError(input: ErrorInput): Promise<void> {
 
   console.error(JSON.stringify({ event: "server_error", ...payload }));
 
-  const admin = supabaseAdmin as unknown as { from: (table: string) => any };
-  const { error: insertError } = await admin.from("app_errors").insert(payload);
+  const { error: insertError } = await supabaseAdmin.from("app_errors").insert(payload);
   if (insertError) {
     console.error(
       JSON.stringify({
